@@ -1,6 +1,6 @@
 # Math Contest Trainer
 
-A practice app for a grade 5-6 student preparing for Math Kangaroo and the International Math Contest (IMC). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call checks the answer, and the app adapts difficulty per skill.
+A practice app for a grade 5-6 student preparing for Math Kangaroo and the International Math Contest (IMC). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call can check the answer (a setting, off by default), and the app adapts difficulty per skill.
 
 ## Files
 
@@ -19,7 +19,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo and the Inter
 ## Rules
 
 - **No copied contest problems.** The Kangaroo style guide was written in our own words from a purchased, copyrighted problem book. Never put that book, its problems, or close paraphrases of them into this repo or into any prompt. Example problems must be original.
-- **Every problem passes the answer check before it is shown.** `makeProblem` writes a draft, then a second independent call solves it. A mismatch discards the draft. Do not add a path that skips this.
+- **The answer check is optional and off by default, by the owner's decision.** When `verify` is on in learner state (Parents tab), `makeProblem` has a second independent call solve each draft and discards it on a mismatch. When it is off, drafts are shown as written, each problem is marked `checked: false`, and the tutor is told the key is unchecked. Never tell the student an answer was checked when it was not. `cleanProblem` always validates the draft's structure.
 - **Figures are data, drawn by code.** The generator returns a figure spec (`grid`, `shape`, `bars`, `table`, `clock`). `validFigure` checks it, `figureEl` draws it, and `figText` gives the same data to the answer check and the tutor. Never render model-written SVG or HTML.
 - **Model and learner text goes in with `textContent`.** The `h()` helper does this. Do not use `innerHTML` for generated or typed text.
 - **The tutor must not reveal an answer before the student has tried.** Keep that rule in `tutorRules`.
