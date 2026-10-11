@@ -1,0 +1,53 @@
+/* One light look in every viewer theme, by choice: the page is squared paper. */
+/* Layout: a squared-paper exercise book. One problem per sheet, a red margin rule down the left, a single left-aligned column. */
+:root{
+  --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
+  --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
+  color-scheme:light;
+  --display:"Gabarito","Trebuchet MS",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+
+*{box-sizing:border-box}
+body{background-color:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;padding-inline:16px;padding-block:20px 48px}
+.book{max-width:44rem;margin-inline:auto;display:flex;flex-direction:column;gap:20px}
+.book.wide{max-width:74rem}
+.work{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
+.work-main{min-width:0}
+.pad{background:var(--sheet);border:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.pad-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 10px;padding:8px 12px;border-bottom:1px solid var(--line)}
+.pad canvas{display:block;width:100%;height:320px;touch-action:none;cursor:crosshair;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+.btn.mini{min-height:38px;padding:4px 12px;font-size:.9rem}
+@media (min-width:760px){
+  .work{grid-template-columns:minmax(0,1fr) minmax(17rem,28rem)}
+  .pad{position:sticky;top:calc(env(safe-area-inset-top,0px) + 64px)}
+  .pad canvas{height:460px}
+}
+.top{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 24px}
+h1{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1.1;margin:0;letter-spacing:-0.01em}
+h2{font-family:var(--display);font-weight:700;font-size:1.35rem;line-height:1.2;margin:0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:700;font-size:1.05rem;margin:0}
+p{margin:0}
+nav{display:flex;flex-wrap:wrap;gap:4px}
+nav a{font-family:var(--display);font-weight:700;color:var(--ink);text-decoration:none;padding:6px 12px;border-bottom:3px solid transparent}
+nav a[aria-current="page"]{border-bottom-color:var(--margin)}
+:focus-visible{outline:3px solid var(--margin);outline-offset:2px}
+
+.sheet{position:relative;background:var(--sheet);border:1px solid var(--line);padding:24px 24px 24px 52px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.sheet::before{content:"";position:absolute;left:32px;top:0;bottom:0;width:1px;background:var(--margin)}
+@media (max-width:480px){ .sheet{padding:18px 16px 18px 30px} .sheet::before{left:16px} }
+.notice{background:var(--hl);color:var(--on-hl);padding:10px 14px;font-weight:700}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;color:var(--muted);font-size:.9rem}
+.skill{font-family:var(--display);font-weight:700;color:var(--ink);font-size:1rem}
+.lv{display:inline-flex;gap:3px;vertical-align:middle}
+.lv i{width:11px;height:11px;border:1.5px solid var(--ink);display:block}
+.lv i.on{background:var(--ink)}
+.question{font-size:1.2rem;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
