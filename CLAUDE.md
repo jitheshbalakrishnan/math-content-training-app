@@ -1,6 +1,6 @@
 # Math Contest Trainer
 
-A practice app for a grade 5-6 student preparing for Math Kangaroo and the International Math Contest (IMC). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call can check the answer (a setting, off by default), and the app adapts difficulty per skill.
+A practice app for a grade 5-6 student preparing for Math Kangaroo, the International Math Contest (IMC) and the CREST Mathematics Olympiad (CMO). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call can check the answer (a setting, off by default), and the app adapts difficulty per skill.
 
 ## Files
 
@@ -18,7 +18,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo and the Inter
 
 ## Rules
 
-- **No copied contest problems.** The Kangaroo style guide was written in our own words from a purchased, copyrighted problem book. Never put that book, its problems, or close paraphrases of them into this repo or into any prompt. Example problems must be original.
+- **No copied contest problems.** The Kangaroo and CREST style guides were written in our own words from a purchased, copyrighted problem book and a copyrighted sample paper. Never put those sources, their problems, or close paraphrases of them into this repo or into any prompt. Example problems must be original.
 - **The answer check is optional and off by default, by the owner's decision.** When `verify` is on in learner state (Parents tab), `makeProblem` has a second independent call solve each draft and discards it on a mismatch. When it is off, drafts are shown as written, each problem is marked `checked: false`, and the tutor is told the key is unchecked. Never tell the student an answer was checked when it was not. `cleanProblem` always validates the draft's structure.
 - **Figures are data, drawn by code.** The generator returns a figure spec (`grid`, `shape`, `bars`, `table`, `clock`). `validFigure` checks it, `figureEl` draws it, and `figText` gives the same data to the answer check and the tutor. Never render model-written SVG or HTML.
 - **Model and learner text goes in with `textContent`.** The `h()` helper does this. Do not use `innerHTML` for generated or typed text.
@@ -40,6 +40,8 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo and the Inter
 - Skill ids are `topic.name`. Skills added by a parent in the app get `custom.<id>` and live in learner state, not in this file.
 - `levels` holds anchors for levels 1, 3 and 5. Levels 2 and 4 are interpolated by the generator.
 - `figures` lists the figure types a skill may use. Leave it out for text-only skills.
+- A contest entry may carry `short` (display name), `choices` (4 or 5 answer choices), `style` (rules, tiers with levels, original examples) and `paper` (minutes, unit, sections) for mock tests. A contest without a `paper` borrows Kangaroo's.
+- `extra: true` marks a skill that is practised but is not in the contest's own syllabus, so mock tests leave it out.
 - To add a contest: add it under `contests`, tag existing skills that overlap, and add new skills for the rest. `build.py` rejects unknown prerequisite ids.
 
 ## Testing
