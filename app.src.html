@@ -219,6 +219,8 @@ function contestNames(sk) { return sk.contests.map(c => MAP.contests[c].name).jo
 function genPrompt(sk, level, st) {
   const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
   const trouble = Object.entries(st.reasons).sort((a, b) => b[1] - a[1])[0];
+  const kg = S.contest !== 'imc' && sk.contests.includes('kangaroo') ? MAP.contests.kangaroo.style : null;
+  const pts = level <= 2 ? 3 : level <= 4 ? 4 : 5;
   return [
     'You write original practice problems for a grade 5-6 student preparing for math contests (' + contestNames(sk) + ').',
     'Skill: ' + sk.name + ' (topic: ' + TOPIC[sk.topic] + ').',
@@ -236,6 +238,9 @@ function genPrompt(sk, level, st) {
     '- A solution in short numbered steps a 10-year-old can follow, ending with the answer.',
     st.recent.length ? '- Make it clearly different from these recent problems: ' + st.recent.map(q => '"' + q + '"').join(' | ') : '',
     trouble ? '- The student\'s most common trouble on this skill: ' + REASON_TEXT[trouble[0]] + '. Keep the wording clear and make the hints address that.' : '',
+    kg ? 'Math Kangaroo style guide:\n' + kg.rules.map(r => '- ' + r).join('\n') : '',
+    kg ? 'Level ' + level + ' matches a ' + pts + '-point Kangaroo question: ' + kg.tiers[pts] : '',
+    kg ? 'Style examples, for tone and shape only. Never reuse their numbers, settings or ideas:\n' + kg.examples.map(e => e.points + '-point: ' + e.question + ' Choices: ' + e.choices.join(', ') + '. Answer: ' + e.choices[e.answer] + '. Idea: ' + e.idea).join('\n') : '',
     'Reply with only JSON in this shape: {"question":"...","choices":["...","...","...","...","..."],"answer":2,"hints":["...","...","..."],"solution":"..."} where "answer" is the 0-based index of the correct choice.',
   ].filter(Boolean).join('\n');
 }
