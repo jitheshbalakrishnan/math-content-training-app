@@ -25,6 +25,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo and the Inter
 - **The tutor must not reveal an answer before the student has tried.** Keep that rule in `tutorRules`.
 - **Leveling stays in plain code.** `applyResult` and `pickNext` decide levels and the next skill. Claude is used for writing, checking and tutoring only.
 - **Claude calls are bounded.** At most two drafts per problem, a time limit per call, and no retry loops. Calls start from a learner action.
+- **Mock tests measure, practice teaches.** A mock test gives no hints, tutor or feedback until it ends, takes its remaining time from the stored end time, and never changes skill levels.
 - **No secrets in the page.** It runs in the viewer's browser.
 
 ## Data
@@ -32,6 +33,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo and the Inter
 - Learner state is one document at `data/users/<id>/state`, mirrored to `localStorage` as a fallback. It includes topics a parent added (`custom`).
 - Each answered problem is appended to `data/users/<id>/log/attempts`. Nothing reads this log yet.
 - Tutor chats are not saved.
+- A mock test in progress or just finished is one document at `data/users/<id>/mock`, also mirrored to `localStorage`. The last 20 results are kept in learner state as `mocks`.
 
 ## Skill map conventions
 
