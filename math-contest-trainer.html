@@ -127,20 +127,45 @@ legend{padding:0;margin-bottom:4px}
 
 .prog-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 16px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
 .prog-row .n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem;min-width:5.5em;text-align:right}
+.home{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:20px;align-items:start}
+a.btn{text-decoration:none;display:flex;align-items:center}
+.foot{font-size:.9rem}
+.foot a{color:var(--muted)}
+.setline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
+.setline b{font-family:var(--display);font-weight:700}
+.setbar{flex:1 1 12rem;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;max-width:30rem}
+.setbar i{height:12px;border:2px solid var(--ink);background:var(--sheet);display:block}
+.setbar i.on{background:var(--ink)}
+.setbar i.now{background:var(--hl)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(13rem,1fr));gap:14px}
+.tile{background:var(--sheet);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.tile.dark{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.tile.dark .muted,.tile.dark a{color:var(--grid)}
+.tile .big{font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.tile .big small{font-size:1.05rem;font-weight:500}
+.meter{height:14px;border:2px solid var(--ink);background:var(--sheet)}
+.meter i{display:block;height:100%;background:var(--ink)}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;text-align:center;font-size:.85rem;font-weight:700}
+.week span{display:flex;flex-direction:column;gap:4px}
+.week i{height:26px;border:2px solid var(--line);display:block}
+.week i.on{background:var(--ink);border-color:var(--ink)}
+.week i.today{border-color:var(--margin)}
+.tag{font-size:.8rem;font-weight:700;background:var(--bad-bg);color:var(--bad);padding:1px 8px;margin-left:8px;white-space:nowrap}
 </style>
 
 <div class="book">
   <header class="top">
     <h1>Math Contest Trainer</h1>
     <nav aria-label="Sections">
+      <a href="#home" id="tab-home">Home</a>
       <a href="#practice" id="tab-practice">Practice</a>
       <a href="#mock" id="tab-mock">Mock test</a>
       <a href="#progress" id="tab-progress">Progress</a>
-      <a href="#parents" id="tab-parents">Parents</a>
     </nav>
   </header>
   <p id="notice" class="notice" hidden></p>
   <main id="view" class="stack"></main>
+  <p class="foot"><a href="#parents" id="tab-parents">For parents</a></p>
 </div>
 
 <script>
@@ -187,7 +212,7 @@ let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
 const env = { ready: false, sample: null, db: null, base: null };
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick' }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick', days: {}, goals: { day: 10, week: 50 } }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -265,6 +290,44 @@ function pickNext(excludeId) {
   return list[list.length - 1].id;
 }
 
+/* ---------- daily tally: how many problems he answered each day, for today's set, the week and the streak ---------- */
+function dayKey(d) {                 // a local calendar day as YYYY-MM-DD
+  const x = d || new Date();
+  return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+}
+function goals() {
+  const g = S.goals || {};
+  return { day: g.day > 0 ? g.day : 10, week: g.week > 0 ? g.week : 50 };
+}
+function tally(n, ok) {              // count n answered problems, ok of them right, against today
+  if (!S.days || typeof S.days !== 'object' || Array.isArray(S.days)) S.days = {};
+  const k = dayKey(), day = S.days[k] || (S.days[k] = { n: 0, ok: 0 });
+  day.n += n; day.ok += ok;
+  const keys = Object.keys(S.days).sort();
+  for (const old of keys.slice(0, Math.max(0, keys.length - 120))) delete S.days[old];      // keep about four months
+}
+function doneToday() { const day = S.days && S.days[dayKey()]; return day ? day.n : 0; }
+function thisWeek() {                // Monday to Sunday, each with its count
+  const now = new Date(), today = dayKey(now), back = (now.getDay() + 6) % 7;
+  return [...'MTWTFSS'].map((letter, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - back + i), key = dayKey(d), day = S.days && S.days[key];
+    return { letter, key, n: day ? day.n : 0, today: key === today, future: key > today };
+  });
+}
+function streak() {                  // days in a row with practice, ending today, or yesterday if he has not practiced yet today
+  const now = new Date();
+  let count = 0;
+  for (let i = 0; i < 400; i++) {
+    const day = S.days && S.days[dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i))];
+    if (day && day.n > 0) count++;
+    else if (i > 0) break;
+  }
+  return count;
+}
+function setBar(done, total, now) {  // one square per problem: filled when done, highlighted for the one in hand
+  return h('span', { class: 'setbar', role: 'img', 'aria-label': Math.min(done, total) + ' of ' + total + ' done' },
+    Array.from({ length: total }, (_, i) => h('i', { class: i < done ? 'on' : i === now ? 'now' : '' })));
+}
 /* ---------- figures: drawn by code from data the generator supplies, so what he sees is what was checked ---------- */
 const NS = 'http://www.w3.org/2000/svg';
 function sv(tag, attrs, ...kids) {
@@ -648,6 +711,7 @@ function check() {
   if (c.picked == null || c.checked) return;
   c.checked = true; c.correct = c.picked === c.p.answer; c.ms = Date.now() - c.t0;
   c.before = clone(skillState(id));
+  tally(1, c.correct ? 1 : 0);
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
@@ -892,6 +956,37 @@ function viewPracticeBody() {
   return [h('div', { class: 'sheet' }, out)];
 }
 
+/* ---------- home: today's set and the ways in ---------- */
+function viewHome() {
+  if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading your progress'))];
+  if (!S.contest) return viewPracticeBody();                // first visit: choose a contest
+  const g = goals(), done = doneToday(), run = streak(), week = thisWeek().reduce((a, d) => a + d.n, 0);
+  const pl = S.placement, placing = !pl.done && !S.focus, left = pl.queue.length - pl.i;
+  const focus = S.focus ? (SK[S.focus] ? SK[S.focus].name : TOPIC[S.focus]) : '';
+  const go = () => { location.hash = '#practice'; if (!cur && env.sample) loadProblem(); else render(); };
+  const say = placing ? 'First, ' + left + (left === 1 ? ' problem' : ' problems') + ' to find your level. They count toward today.'
+    : done >= g.day ? "Today's set is done. You answered " + done + ' problems.'
+    : done ? 'You have done ' + done + " of today's " + g.day + ' problems.'
+    : g.day + ' problems' + (focus ? ' on ' + focus + '.' : ', mixed from every topic.');
+  const label = placing ? (pl.i ? 'Carry on finding my level' : 'Find my level')
+    : done >= g.day ? 'Practice some more' : done ? 'Carry on with problem ' + (done + 1) : "Start today's set";
+  return [h('div', { class: 'home' },
+    h('div', { class: 'stack' },
+      h('div', { class: 'sheet' },
+        h('h2', null, 'Today'),
+        h('p', null, say),
+        h('div', { class: 'setline' }, setBar(done, g.day, done < g.day ? done : -1)),
+        h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: go }, label))),
+      run >= 2 ? h('p', { class: 'notice' }, run + ' days of practice in a row') : null),
+    h('div', { class: 'stack' },
+      h('div', { class: 'sheet' },
+        h('h3', null, 'Or choose'),
+        h('div', { class: 'stack' },
+          h('a', { class: 'btn', href: '#practice' }, 'Practice one topic'),
+          h('a', { class: 'btn', href: '#mock' }, 'Take a timed mock test'),
+          h('a', { class: 'btn', href: '#progress' }, 'See my progress'))),
+      h('p', { class: 'muted' }, 'This week: ' + week + ' of ' + g.week + ' problems')))];
+}
 let confirmReset = false;
 function viewProgress() {
   const out = viewProgressBody();
@@ -1089,6 +1184,7 @@ function finishMock() {
   m.usedSecs = Math.round((Math.min(Date.now(), m.endsAt) - m.started) / 1000);
   const r = mockScore(m), at = new Date().toISOString();
   S.mocks = (S.mocks || []).concat({ at, size: m.size, n: m.items.length, correct: r.correct, score: r.score, max: r.max, secs: m.usedSecs, unit: m.unit || 'point' }).slice(-20);
+  tally(m.answers.filter(a => a != null).length, r.correct);     // test questions he answered count toward the day and the week
   saveState(); saveMock();          // skill levels are left alone: a test measures, practice teaches
   m.items.forEach((it, i) => logAttempt({ at, skill: it.skill, level: it.level, mode: 'mock', question: it.p.question, figure: it.p.figure || null, choices: it.p.choices, answer: it.p.answer, picked: m.answers[i], correct: m.answers[i] === it.p.answer, ms: null, hints: 0, reason: null, note: '' }));
   render();
@@ -1248,13 +1344,19 @@ function viewParents() {
     h('p', { class: 'muted small' }, S.verify
       ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
       : 'Off. Problems appear sooner and are never thrown away, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
-  return [form, list, check];
+  const setGoal = (key, lo, hi) => ev => { const v = Math.round(Number(ev.target.value)); S.goals = Object.assign({}, goals(), { [key]: Math.max(lo, Math.min(hi, v || lo)) }); saveState(); render(); };
+  const goal = h('div', { class: 'sheet' }, h('h3', null, 'Goals'),
+    h('div', { class: 'row' },
+      h('div', { class: 'field' }, h('label', { for: 'pt-day' }, 'Problems a day'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-day', value: goals().day, onchange: setGoal('day', 3, 30) })),
+      h('div', { class: 'field' }, h('label', { for: 'pt-week' }, 'Problems a week'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-week', value: goals().week, onchange: setGoal('week', 10, 200) }))),
+    h('p', { class: 'muted small' }, 'The daily goal is the size of "today\'s set" on his Home screen. Reaching it does not stop him practicing. Daily goal 3 to 30, weekly goal 10 to 200.'));
+  return [form, list, goal, check];
 }
 
 function render() {
-  const route = ['progress', 'parents', 'mock'].find(r => location.hash === '#' + r) || 'practice';
-  for (const r of ['practice', 'mock', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
-  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : route === 'mock' ? viewMock() : viewPractice()));
+  const route = ['practice', 'progress', 'parents', 'mock'].find(r => location.hash === '#' + r) || 'home';
+  for (const r of ['home', 'practice', 'mock', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : route === 'mock' ? viewMock() : route === 'home' ? viewHome() : viewPractice()));
   document.querySelector('.book').classList.toggle('wide', !!$('view').querySelector('.work'));     // room for the scratchpad beside the problem
   if (route === 'practice' && cur && cur.p) { if (cur.chatOpen) renderChat(); if (cur.target.mode !== 'placement' && placedNote && cur.checked) placedNote = false; }
 }
@@ -1272,6 +1374,8 @@ async function boot() {
   if (!Array.isArray(S.custom)) S.custom = [];
   syncCustom();
   if (!Array.isArray(S.mocks)) S.mocks = [];
+  if (!S.days || typeof S.days !== 'object' || Array.isArray(S.days)) S.days = {};
+  if (!S.goals || typeof S.goals !== 'object') S.goals = { day: 10, week: 50 };
   mock = await loadMock();
   env.ready = true;
   if (mock && mock.phase === 'run' && Date.now() >= mock.endsAt) finishMock();   // time ran out while the page was closed
