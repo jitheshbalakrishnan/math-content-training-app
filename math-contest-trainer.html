@@ -157,7 +157,7 @@ let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
 const env = { ready: false, sample: null, db: null, base: null };
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -480,6 +480,8 @@ async function makeProblem(skillId, level) {
     try { p = cleanProblem(await ask(genPrompt(sk, level, st)), sk); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the draft could not be read as data'); continue; } throw e; }
     if (p.fault) { why.push(p.fault); continue; }
+    p.checked = !!S.verify;
+    if (!S.verify) return p;             // the second solve is off by the owner's choice (Parents tab); the problem is shown as written
     stage.set(key, draft ? 'recheck' : 'check');
     try { v = await ask(verifyPrompt(p)); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
@@ -616,15 +618,16 @@ function tutorRules(c) {
     '- Do not state the final answer or the correct letter unless he has already answered the problem and either asks to see it or has made two real attempts in this chat.',
     '- If an explanation does not land, try a different one: smaller numbers, a picture described in words, or a real-life version.',
     '- Be encouraging and honest. Never tell him a wrong step is right.',
-    '- The verified answer and solution below are the ground truth. Never give a different answer.',
+    p.checked ? '- The verified answer and solution below are the ground truth. Never give a different answer.'
+      : '- The answer key below was NOT double-checked. Work the problem out yourself as you go. If the key is wrong, tell him plainly that the answer key has a mistake, show the correct answer, and tell him it was not his fault.',
     '- Plain text only: no Markdown, no LaTeX. Write fractions like 3/4.',
     '- Stay on math. If he goes off topic, bring him back kindly in one sentence.',
     'Skill: ' + SK[c.target.skill].name + ', level ' + c.target.level + ' of 5.',
     'Problem: ' + p.question,
     p.figure ? 'The figure he sees: ' + figText(p.figure) : '',
     'Choices: ' + p.choices.map((x, i) => LETTERS[i] + ') ' + (p.choice_figures ? figText(p.choice_figures[i]) : x)).join('; '),
-    'Verified answer: ' + LETTERS[p.answer] + ') ' + p.choices[p.answer],
-    'Verified solution: ' + p.solution,
+    (p.checked ? 'Verified answer: ' : 'Answer key (not double-checked): ') + LETTERS[p.answer] + ') ' + p.choices[p.answer],
+    (p.checked ? 'Verified solution: ' : 'Solution from the answer key (not double-checked): ') + p.solution,
     'Status: ' + status,
   ].filter(Boolean).join('\n');
 }
@@ -713,7 +716,7 @@ function viewPracticeBody() {
     const pl = S.placement, fresh = !pl.done && pl.i === 0;
     return [h('div', { class: 'sheet' },
       h('h2', null, fresh ? 'First, ' + pl.queue.length + ' problems to find your level' : pl.done ? 'Ready for more?' : 'Finish finding your level'),
-      h('p', { class: 'muted' }, fresh ? 'One medium problem from each topic. No timer. Each problem is written fresh and its answer is checked twice before you see it, so the first one can take up to a minute.' : pl.done ? 'Pick up where you left off. ' + CONTESTS[S.contest] + '.' : (pl.queue.length - pl.i) + ' placement problems left.'),
+      h('p', { class: 'muted' }, fresh ? 'One medium problem from each topic. No timer. Each problem is written fresh' + (S.verify ? ' and its answer is checked before you see it' : '') + ', so the first one can take up to a minute.' : pl.done ? 'Pick up where you left off. ' + CONTESTS[S.contest] + '.' : (pl.queue.length - pl.i) + ' placement problems left.'),
       h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, fresh ? 'Start' : 'Continue')))];
   }
   const t = cur.target, sk = SK[t.skill];
@@ -724,7 +727,7 @@ function viewPracticeBody() {
     t.mode === 'retry' ? h('span', null, 'A similar one to try again') : null);
   if (cur.loading) return [h('div', { class: 'sheet' }, meta,
     h('p', null, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), h('span', { id: 'wait-line' }, waitText())),
-    h('p', { class: 'muted small' }, 'Each problem is written, then solved a second time to check the answer. That usually takes under a minute, and longer for problems with figures.'),
+    h('p', { class: 'muted small' }, S.verify ? 'Each problem is written, then solved a second time to check the answer. That usually takes under a minute, and longer for problems with figures.' : 'Each problem is written fresh. That usually takes under a minute, and longer for problems with figures.'),
     h('div', { class: 'row', id: 'wait-again', hidden: Date.now() - cur.since < 45000 },
       h('span', null, 'Taking a while?'), h('button', { class: 'btn quiet', type: 'button', onclick: loadProblem }, 'Start this one again')))];
   if (cur.error) return [h('div', { class: 'sheet' }, meta, h('p', null, cur.error),
@@ -829,7 +832,7 @@ function viewParents() {
   const mine = S.custom || [];
   const form = h('form', { class: 'sheet', onsubmit: addTopic },
     h('h2', null, 'Add a topic'),
-    h('p', { class: 'muted' }, 'For parents. Add anything the built-in list misses. Problems for it are written and answer-checked the same way. It starts at level 3 and moves up or down as he answers.'),
+    h('p', { class: 'muted' }, 'For parents. Add anything the built-in list misses. Problems for it are written the same way as the built-in topics. It starts at level 3 and moves up or down as he answers.'),
     h('div', { class: 'field' }, h('label', { for: 'pt-name' }, 'Topic name'),
       h('input', { type: 'text', id: 'pt-name', maxlength: 60, autocomplete: 'off', placeholder: 'Ratios and proportions' })),
     h('div', { class: 'field' }, h('label', { for: 'pt-note' }, 'What should the problems cover?'),
@@ -854,7 +857,12 @@ function viewParents() {
               h('button', { class: 'btn quiet', type: 'button', onclick: () => { removing = null; render(); } }, 'Keep it'))
           : h('button', { class: 'btn quiet', type: 'button', onclick: () => { removing = s.id; render(); } }, 'Remove'));
     })) : h('p', { class: 'muted' }, 'None yet. A topic you add shows up here, in Progress, and in his practice within a few problems.'));
-  return [form, list];
+  const check = h('div', { class: 'sheet' }, h('h3', null, 'Answer checking'),
+    h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-verify', checked: !!S.verify, onchange: ev => { S.verify = ev.target.checked; pre.clear(); saveState(); render(); } }), 'Solve each problem a second time before showing it'),
+    h('p', { class: 'muted small' }, S.verify
+      ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
+      : 'Off. Problems appear sooner and are never thrown away, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
+  return [form, list, check];
 }
 
 function render() {
