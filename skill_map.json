@@ -1,5 +1,5 @@
 {
-  "version": "0.6-draft",
+  "version": "0.7-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
@@ -16,14 +16,33 @@
           "Give five short choices. Put numeric choices in increasing order, close together or evenly spaced, so guessing by size does not work.",
           "In the solution, lead with the key idea, then the steps. Where natural, say why the most tempting wrong choice fails."
         ],
-        "tiers": {
-          "3": "one or two steps of direct reasoning that a careful reader gets quickly.",
-          "4": "two conditions to combine, or a process to track over several steps.",
-          "5": "short to state, but needs a case analysis, a parity or counting argument, or an extreme-case idea."
-        },
+        "tiers": [
+          {
+            "label": "3-point",
+            "levels": [
+              1,
+              2
+            ],
+            "text": "one or two steps of direct reasoning that a careful reader gets quickly."
+          },
+          {
+            "label": "4-point",
+            "levels": [
+              3,
+              4
+            ],
+            "text": "two conditions to combine, or a process to track over several steps."
+          },
+          {
+            "label": "5-point",
+            "levels": [
+              5
+            ],
+            "text": "short to state, but needs a case analysis, a parity or counting argument, or an extreme-case idea."
+          }
+        ],
         "examples": [
           {
-            "points": 3,
             "question": "Otto reads 3 pages of his comic every morning and 5 pages every evening. He starts on Monday morning. On which day does he read page 30?",
             "choices": [
               "Tuesday",
@@ -33,10 +52,10 @@
               "Saturday"
             ],
             "answer": 2,
-            "idea": "He reads 8 pages a day, so pages 25 to 32 fall on the fourth day."
+            "idea": "He reads 8 pages a day, so pages 25 to 32 fall on the fourth day.",
+            "tier": "3-point"
           },
           {
-            "points": 4,
             "question": "A lighthouse flashes red every 6 seconds and green every 10 seconds. Both flash together at midnight. How many times do they flash together during the next 100 seconds?",
             "choices": [
               "2",
@@ -46,10 +65,10 @@
               "10"
             ],
             "answer": 1,
-            "idea": "They coincide every 30 seconds: at 30, 60 and 90 seconds."
+            "idea": "They coincide every 30 seconds: at 30, 60 and 90 seconds.",
+            "tier": "4-point"
           },
           {
-            "points": 5,
             "question": "Five friends meet and some of them shake hands. Ana shakes 4 hands, Ben 3, Cleo 2 and Dev 1. How many hands does Eli shake?",
             "choices": [
               "0",
@@ -59,21 +78,149 @@
               "4"
             ],
             "answer": 2,
-            "idea": "Ana shakes everyone's hand, so Dev's only handshake is with Ana. Ben's other two must be Cleo and Eli, which completes Cleo's two. Eli shakes hands with Ana and Ben."
+            "idea": "Ana shakes everyone's hand, so Dev's only handshake is with Ana. Ben's other two must be Cleo and Eli, which completes Cleo's two. Eli shakes hands with Ana and Ben.",
+            "tier": "5-point"
           }
         ]
       },
-      "short": "Math Kangaroo"
+      "short": "Math Kangaroo",
+      "choices": 5,
+      "paper": {
+        "minutes": 75,
+        "unit": "point",
+        "note": "Wrong answers do not lose points, so answer every question.",
+        "sections": [
+          {
+            "label": "3-point questions",
+            "count": 10,
+            "points": 3,
+            "levels": [
+              2
+            ]
+          },
+          {
+            "label": "4-point questions",
+            "count": 10,
+            "points": 4,
+            "levels": [
+              3,
+              4
+            ]
+          },
+          {
+            "label": "5-point questions",
+            "count": 10,
+            "points": 5,
+            "levels": [
+              5
+            ]
+          }
+        ]
+      }
     },
     "imc": {
       "name": "International Math Contest (IMC)",
       "format_note": "Organizer, grade level, question count and time limit still to confirm.",
-      "short": "International Math Contest"
+      "short": "International Math Contest",
+      "choices": 5
     },
     "olympiad": {
-      "name": "Math Olympiad, grades 5-6",
-      "short": "Math Olympiad",
-      "format_note": "Topics come from a syllabus the owner supplied under the name MOEMS. Its content (HCF and LCM, profit and loss, simple interest, coding-decoding, blood relations, mirror and water images) reads like a class 6 olympiad syllabus such as SOF IMO, not like MOEMS, which publishes no fixed syllabus. Which contest this is, and its paper format, are still to confirm."
+      "name": "CREST Mathematics Olympiad (CMO), grade 6",
+      "short": "CREST Math Olympiad",
+      "format_note": "From the CREST grade 6 sample paper: 50 multiple-choice questions with four options in 60 minutes. Practical Mathematics has 40 questions at 1 mark and the Achiever's Section has 10 at 2 marks, for 60 marks. The paper's own syllabus lists number, geometry, mensuration, algebra, ratio, symmetry and data topics only. Skills marked extra come from an earlier list the owner supplied and are not in that syllabus. Whether wrong answers lose marks is not confirmed.",
+      "choices": 4,
+      "paper": {
+        "minutes": 60,
+        "unit": "mark",
+        "sections": [
+          {
+            "label": "Practical Mathematics",
+            "count": 40,
+            "points": 1,
+            "levels": [
+              2,
+              3
+            ]
+          },
+          {
+            "label": "Achiever's Section",
+            "count": 10,
+            "points": 2,
+            "levels": [
+              4,
+              5
+            ]
+          }
+        ]
+      },
+      "style": {
+        "source_note": "Written in our own words after studying the CREST grade 6 sample paper. No question from it is copied here; the examples below are original.",
+        "rules": [
+          "Ask it the way a school textbook exercise would: direct, with exactly what to find stated plainly.",
+          "One fact or one standard calculation per question at the lower levels. No trick wording.",
+          "Favor these question shapes: fill in the blank with a term or value, which statement is true or not true, find the value of x, simplify an expression, read a value off a graph or table, or match two short lists where each choice is a complete matching.",
+          "Numbers may need written working: decimals, fractions, percentages and ratios are welcome.",
+          "Use the vocabulary of the grade 6 syllabus, such as HCF and LCM, integers, ratio, perimeter and area, lines of symmetry.",
+          "In the solution, show the standard method step by step with each calculation written out."
+        ],
+        "tiers": [
+          {
+            "label": "1-mark",
+            "levels": [
+              1,
+              2,
+              3
+            ],
+            "text": "a single concept recalled or one routine calculation."
+          },
+          {
+            "label": "2-mark Achiever's Section",
+            "levels": [
+              4,
+              5
+            ],
+            "text": "two or three linked steps or two concepts combined, still solved by a standard method."
+          }
+        ],
+        "examples": [
+          {
+            "tier": "1-mark",
+            "question": "Fill in the blank: A triangle whose three sides all have different lengths is called a ______ triangle.",
+            "choices": [
+              "Equilateral",
+              "Isosceles",
+              "Scalene",
+              "Right"
+            ],
+            "answer": 2,
+            "idea": "Scalene means no two sides are equal."
+          },
+          {
+            "tier": "1-mark",
+            "question": "The ratio of boys to girls in a club is 2:5. If the club has 35 children, how many are girls?",
+            "choices": [
+              "10",
+              "14",
+              "21",
+              "25"
+            ],
+            "answer": 3,
+            "idea": "7 parts make 35, so one part is 5 and the girls are 5 parts, 25."
+          },
+          {
+            "tier": "2-mark Achiever's Section",
+            "question": "The price of a book is raised by 20%, and the new price is then reduced by 20%. Compared with the original price, the final price is:",
+            "choices": [
+              "4% lower",
+              "the same",
+              "4% higher",
+              "2% lower"
+            ],
+            "answer": 0,
+            "idea": "100 becomes 120, then 120 minus 24 is 96, which is 4% below 100."
+          }
+        ]
+      }
     }
   },
   "topics": [
@@ -871,7 +1018,8 @@
         "1": "Continue a letter series with a fixed skip",
         "3": "Find the missing term in a series mixing letters and numbers",
         "5": "Find the wrong term, or a series with two alternating rules"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.coding_decoding",
@@ -885,7 +1033,8 @@
         "1": "Decode a word when each letter moves a fixed number of places",
         "3": "Work out the rule from one coded word and apply it to another",
         "5": "Codes that use number values of letters or a rule that changes by position"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.analogy_odd_one_out",
@@ -899,7 +1048,8 @@
         "1": "Pick the odd one out from five numbers or words",
         "3": "Complete a number or word analogy",
         "5": "Find the odd one out where two rules look plausible and only one fits all the others"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.cubes_dice",
@@ -915,7 +1065,8 @@
         "1": "Use opposite faces of a standard die adding to 7",
         "3": "Find the face opposite a given face from two views described in words",
         "5": "Count small cubes with 0, 1, 2 or 3 painted faces after a painted cube is cut"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.direction_sense",
@@ -929,7 +1080,8 @@
         "1": "Follow two turns and say which way someone faces",
         "3": "Follow a walk with several legs and find the distance or direction from the start",
         "5": "Walks with turns given as left and right from a changing heading, or two walkers"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.blood_relations",
@@ -943,7 +1095,8 @@
         "1": "Name the relationship from one statement",
         "3": "Chain two or three statements to find how two people are related",
         "5": "Coded relationships, or a family of six with several clues"
-      }
+      },
+      "extra": true
     },
     {
       "id": "logic.venn_diagrams",
@@ -959,6 +1112,23 @@
         "1": "Read how many belong to one group from a two-group description",
         "3": "Find how many belong to both or neither of two groups",
         "5": "Three overlapping groups with several counts given"
+      },
+      "extra": true
+    },
+    {
+      "id": "number.exponents",
+      "name": "Powers and exponents",
+      "topic": "number",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Evaluate a small power, or write a repeated product as a power",
+        "3": "Multiply or divide powers of the same base",
+        "5": "Simplify an expression that mixes products, quotients and powers of powers"
       }
     }
   ]
