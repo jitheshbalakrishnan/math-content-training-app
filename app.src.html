@@ -1,21 +1,15 @@
 <title>Math Contest Trainer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@500;700;800&display=swap">
 <style>
+/* One light look in every viewer theme, by choice: the page is squared paper. */
 /* Layout: a squared-paper exercise book. One problem per sheet, a red margin rule down the left, a single left-aligned column. */
 :root{
   --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
   --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
+  color-scheme:light;
   --display:"Gabarito","Trebuchet MS",system-ui,sans-serif;
   --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --paper:#12241F; --grid:#1B332C; --sheet:#182E28; --ink:#EDF3EC; --muted:#A3B8AD;
-  --margin:#EE8176; --hl:#F2CE4A; --on-hl:#12241F; --good:#74D6A8; --good-bg:#1D4234; --bad:#F39C92; --bad-bg:#47251F; --line:#35524A; --shade:#5E7A70;
-  color-scheme:dark } }
-:root[data-theme="dark"]{
-  --paper:#12241F; --grid:#1B332C; --sheet:#182E28; --ink:#EDF3EC; --muted:#A3B8AD;
-  --margin:#EE8176; --hl:#F2CE4A; --on-hl:#12241F; --good:#74D6A8; --good-bg:#1D4234; --bad:#F39C92; --bad-bg:#47251F; --line:#35524A; --shade:#5E7A70;
-  color-scheme:dark }
 
 *{box-sizing:border-box}
 body{background-color:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
@@ -76,6 +70,8 @@ input[type=text]{font:inherit;color:var(--ink);background:var(--sheet);border:0;
 .figure table{border-collapse:collapse;font-variant-numeric:tabular-nums}
 .figure th,.figure td{border:1px solid var(--ink);padding:6px 12px;text-align:left}
 .figure th{font-family:var(--display)}
+.pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.pick select{width:auto;flex:1 1 14rem;max-width:24rem;min-height:46px}
 .field{display:flex;flex-direction:column;gap:4px}
 .field input[type=text]{flex:none;width:100%}
 label,legend{font-weight:700}
@@ -161,7 +157,7 @@ let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
 const env = { ready: false, sample: null, db: null, base: null };
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [] }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -207,8 +203,17 @@ function applyResult(st, r) {
   if (wrong && r.reason) st.reasons[r.reason] = (st.reasons[r.reason] || 0) + 1;
   return st;
 }
+function focusSkills() {              // the skills in play: one topic if the student picked one, otherwise all of them
+  const all = contestSkills();
+  if (!S.focus) return all;
+  const some = all.filter(s => s.topic === S.focus);
+  if (some.length) return some;
+  S.focus = null;                    // the chosen topic has no skills left, so fall back to the mix
+  return all;
+}
 function pickNext(excludeId) {
-  const list = contestSkills().filter(s => s.id !== excludeId);
+  const pool = focusSkills(), others = pool.filter(s => s.id !== excludeId);
+  const list = others.length ? others : pool;       // a topic with a single skill repeats that skill
   const weights = list.map(s => {
     const st = skillState(s.id);
     let w = 1 + (st.n === 0 ? 2 : 0) + (st.n >= 2 && st.ok / st.n < 0.6 ? 2 : 0) + (st.down > 0 ? 1 : 0);
@@ -469,20 +474,22 @@ function cleanProblem(p, sk) {
 }
 const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after this long
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
-function ask(prompt) {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CALL_LIMIT_MS);
-  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => clearTimeout(timer));
+function ask(prompt, outer) {         // one Claude call, stopped by its time limit or by the caller's signal
+  const ctl = new AbortController(), stop = () => ctl.abort(), timer = setTimeout(stop, CALL_LIMIT_MS);
+  if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', stop); }
+  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
 }
-async function makeProblem(skillId, level) {
+async function makeProblem(skillId, level, signal) {
   const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [];
   for (let draft = 0; draft < 2; draft++) {            // at most two drafts, then give up and say so
     let p, v;
+    if (signal && signal.aborted) throw { code: 'cancelled' };
     stage.set(key, draft ? 'redo' : 'write');
-    try { p = cleanProblem(await ask(genPrompt(sk, level, st)), sk); }
+    try { p = cleanProblem(await ask(genPrompt(sk, level, st), signal), sk); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the draft could not be read as data'); continue; } throw e; }
     if (p.fault) { why.push(p.fault); continue; }
     stage.set(key, draft ? 'recheck' : 'check');
-    try { v = await ask(verifyPrompt(p)); }
+    try { v = await ask(verifyPrompt(p), signal); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
     const said = String((v && v.answer) == null ? '' : v.answer).trim();
     const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
@@ -491,13 +498,28 @@ async function makeProblem(skillId, level) {
   }
   throw { code: 'unverified', why };
 }
-const pre = new Map();
+const pre = new Map();               // problems being written ahead of need: key -> { promise, ctl }
+let live = null;                     // the controller for the problem the student is waiting on
 function fetchProblem(skillId, level) {
   const k = skillId + '@' + level;
-  if (!pre.has(k)) { const pr = makeProblem(skillId, level); pr.catch(() => {}); pre.set(k, pr); }
+  if (!pre.has(k)) {
+    const ctl = new AbortController(), promise = makeProblem(skillId, level, ctl.signal);
+    promise.catch(() => {});
+    pre.set(k, { promise, ctl });
+  }
   return pre.get(k);
 }
-function takeProblem(skillId, level) { const pr = fetchProblem(skillId, level); pre.delete(skillId + '@' + level); return pr; }
+function takeProblem(skillId, level) {
+  if (live) live.abort();            // stop a problem he was waiting on and no longer wants (no effect once it has finished)
+  const entry = fetchProblem(skillId, level);
+  pre.delete(skillId + '@' + level);
+  live = entry.ctl;
+  return entry.promise;
+}
+function dropPrepared() {            // stop and forget every problem prepared ahead, so no unwanted calls keep running
+  for (const entry of pre.values()) entry.ctl.abort();
+  pre.clear();
+}
 function errCopy(e) {
   const c = e && e.code;
   if (c === 'not_granted') return "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu, then try again.";
@@ -509,13 +531,16 @@ function errCopy(e) {
 
 /* ---------- practice flow ---------- */
 function nextTarget() {
-  while (!S.placement.done && !SK[S.placement.queue[S.placement.i]]) {   // skip a placement slot whose topic was removed
-    S.placement.i++;
-    if (S.placement.i >= S.placement.queue.length) S.placement.done = true;
+  const pool = focusSkills();        // also clears a chosen topic that has no skills left
+  if (!S.focus) {                    // placement waits while the student practises a chosen topic
+    while (!S.placement.done && !SK[S.placement.queue[S.placement.i]]) {   // skip a placement slot whose topic was removed
+      S.placement.i++;
+      if (S.placement.i >= S.placement.queue.length) S.placement.done = true;
+    }
+    if (!S.placement.done) return { skill: S.placement.queue[S.placement.i], level: 3, mode: 'placement' };
   }
-  if (!S.placement.done) return { skill: S.placement.queue[S.placement.i], level: 3, mode: 'placement' };
   if (S.retry && SK[S.retry]) return { skill: S.retry, level: skillState(S.retry).level, mode: 'retry' };
-  if (!S.planned || !SK[S.planned] || S.planned === S.last) S.planned = pickNext(S.last);
+  if (!S.planned || !SK[S.planned] || S.planned === S.last || !pool.some(x => x.id === S.planned)) S.planned = pickNext(S.last);
   return { skill: S.planned, level: skillState(S.planned).level, mode: 'practice' };
 }
 async function loadProblem() {
@@ -525,7 +550,7 @@ async function loadProblem() {
   try {
     const wanted = takeProblem(t.skill, t.level);
     // Start the following problem now, so it is being written while this one is written and solved.
-    if (!S.placement.done) { const nx = S.placement.queue[S.placement.i + 1]; if (nx && SK[nx]) fetchProblem(nx, 3); }
+    if (t.mode === 'placement') { const nx = S.placement.queue[S.placement.i + 1]; if (nx && SK[nx]) fetchProblem(nx, 3); }
     else { S.planned = pickNext(t.skill); fetchProblem(S.planned, skillState(S.planned).level); }
     const p = await wanted;
     if (!cur || cur.target !== t) return;
@@ -633,15 +658,19 @@ async function tutorSend(text, hidden) {
   const reply = { role: 'assistant', content: '', pending: true };
   const turns = [{ role: 'user', content: tutorRules(c) }].concat(c.chat.filter(m => m.content && !m.error).slice(-16).map(m => ({ role: m.role, content: m.content })));
   c.chat.push(reply); c.busy = true; c.ctl = new AbortController();
+  let late = false;
+  const timer = setTimeout(() => { late = true; c.ctl.abort(); }, CALL_LIMIT_MS);   // same limit as problem writing
   renderChat();
   try {
     const r = await env.sample(turns, { cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } });
     reply.content = r.text;
   } catch (e) {
     reply.content = (e && e.text) || '';
-    if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
+    if (late) reply.error = 'The tutor took too long to answer, so it was stopped. Ask again.';
+    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
     if (!reply.content && !reply.error) c.chat.splice(c.chat.indexOf(reply), 1);
   }
+  clearTimeout(timer);
   reply.pending = false; c.busy = false;
   if (cur === c) renderChat();
 }
@@ -676,13 +705,37 @@ function chatBlock(c) {
 function levelDots(n) { return h('span', { class: 'lv', role: 'img', 'aria-label': 'Level ' + n + ' of 5' }, [1, 2, 3, 4, 5].map(i => h('i', { class: i <= n ? 'on' : '' }))); }
 function busyLine(t) { return h('p', null, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), t); }
 
+function chooseTopic(id) {
+  S.focus = id && TOPIC[id] ? id : null;
+  S.planned = null; S.retry = null;
+  dropPrepared();                    // problems prepared for the old choice are no longer wanted
+  saveState();
+  if (cur && !(cur.p && cur.checked)) { if (cur.ctl) cur.ctl.abort(); loadProblem(); }   // swap an unanswered problem right away
+  else render();                     // an answered one stays up; the choice applies from the next problem
+}
+function topicPicker() {
+  const inPlay = TOPICS.filter(tp => contestSkills().some(s => s.topic === tp.id));
+  return h('div', { class: 'pick' }, h('label', { for: 'topic-pick' }, 'What to practise'),
+    h('select', { id: 'topic-pick', onchange: ev => chooseTopic(ev.target.value) },
+      h('option', { value: '', selected: !S.focus }, 'A mix of everything'),
+      inPlay.map(tp => h('option', { value: tp.id, selected: S.focus === tp.id }, tp.name))));
+}
 function viewPractice() {
+  if (env.ready && S.contest) focusSkills();        // drop a chosen topic that no longer has skills
+  const body = viewPracticeBody();
+  return env.ready && S.contest && env.sample ? [topicPicker(), ...body] : body;
+}
+function viewPracticeBody() {
   if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading your progress'))];
   if (!S.contest) return [h('div', { class: 'sheet' },
     h('h2', null, 'Which contest are you training for?'),
     h('p', { class: 'muted' }, 'You start with a few medium problems, one per topic. After that, every skill moves up or down on its own as you answer.'),
     h('div', { class: 'row' }, Object.keys(CONTESTS).map(k => h('button', { class: 'btn', type: 'button', onclick: () => chooseContest(k) }, CONTESTS[k]))))];
   if (!env.sample) return [h('div', { class: 'sheet' }, h('h2', null, 'Open this page in Claude to practise'), h('p', { class: 'muted' }, 'Problems and tutor replies are written by Claude, which is not available in this view.'))];
+  if (!cur && S.focus) return [h('div', { class: 'sheet' },
+    h('h2', null, TOPIC[S.focus]),
+    h('p', { class: 'muted' }, 'Problems from this topic only. Each skill in it still moves up or down as you answer. Switch back to a mix whenever you like.'),
+    h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Start')))];
   if (!cur) {
     const pl = S.placement, fresh = !pl.done && pl.i === 0;
     return [h('div', { class: 'sheet' },
@@ -769,7 +822,7 @@ function viewProgress() {
       return h('div', { class: 'prog-row' }, h('span', null, s.name), st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'), h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
   const reset = h('div', { class: 'row' }, confirmReset
-    ? [h('span', null, 'Erase all progress? Topics you added stay.'), h('button', { class: 'btn', type: 'button', onclick: () => { confirmReset = false; const kept = S.custom || []; S = newState(); S.custom = kept; syncCustom(); cur = null; pre.clear(); saveState(); location.hash = '#practice'; render(); } }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
+    ? [h('span', null, 'Erase all progress? Topics you added stay.'), h('button', { class: 'btn', type: 'button', onclick: () => { confirmReset = false; const kept = S.custom || []; S = newState(); S.custom = kept; syncCustom(); if (live) live.abort(); cur = null; dropPrepared(); saveState(); location.hash = '#practice'; render(); } }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
     : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
   return [head, ...groups, reset];
 }
