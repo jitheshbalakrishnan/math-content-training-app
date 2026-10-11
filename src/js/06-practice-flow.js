@@ -67,6 +67,7 @@ function check() {
   c.before = clone(skillState(id));
   const goal = goals().day, soFar = doneToday();
   tally(1, c.correct ? 1 : 0);
+  c.fresh = true;
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
@@ -76,6 +77,7 @@ function check() {
 function checkRetry() {              // another go at a missed question; stats and level keep the first answer
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
+  c.fresh = true;
   if (c.pick2 === c.p.answer) c.fixed = true;
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;

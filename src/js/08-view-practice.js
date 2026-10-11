@@ -84,13 +84,14 @@ function viewPracticeBody() {
     h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Try again')))];
 
   const c = cur, p = c.p, st = skillState(t.skill);
+  const fresh = !!c.fresh; c.fresh = false;             // true only for the first drawing after an answer, so animations play once
   const missed = c.checked && !c.correct ? [c.picked].concat(c.missed || []) : [];     // every choice he has tried and got wrong
   const showRight = c.checked && (c.correct || c.revealed || c.fixed);
   const open = !c.checked || c.retrying;
   const canRetry = c.checked && !c.correct && !c.fixed && !c.revealed && !c.retrying && missed.length < p.choices.length - 1;
   const choices = h('div', { role: 'group', 'aria-label': 'Answer choices' }, p.choices.map((txt, i) => {
     const right = showRight && i === p.answer, wrong = missed.includes(i);
-    return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : ''), type: 'button', disabled: !open || wrong, 'aria-pressed': open && (c.retrying ? c.pick2 : c.picked) === i ? 'true' : 'false', onclick: () => { if (c.retrying) c.pick2 = i; else c.picked = i; render(); } },
+    return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : '') + (fresh && wrong && i === missed[missed.length - 1] ? ' shake' : ''), type: 'button', disabled: !open || wrong, 'aria-pressed': open && (c.retrying ? c.pick2 : c.picked) === i ? 'true' : 'false', onclick: () => { if (c.retrying) c.pick2 = i; else c.picked = i; render(); } },
       h('b', null, LETTERS[i]), h('span', null, p.choice_figures ? figureEl(p.choice_figures[i], true) : txt), right ? h('em', null, 'Correct') : wrong ? h('em', null, missed.length > 1 ? 'Tried' : 'Your answer') : null);
   }));
   const out = [progressLine(c, t), meta];
@@ -106,7 +107,7 @@ function viewPracticeBody() {
   } else {
     const moved = st.level - c.before.level;
     out.push(h('hr'));
-    out.push(h('p', { class: 'verdict ' + (c.correct || c.fixed ? 'good' : 'bad') }, c.correct ? 'Correct' : c.fixed ? 'Correct on try ' + (missed.length + 1) : c.retrying ? 'Pick another answer' : 'Not this one'));
+    out.push(h('p', { class: 'verdict ' + (c.correct || c.fixed ? 'good' : 'bad') + (fresh ? ' pop' : '') }, c.correct ? 'Correct' : c.fixed ? 'Correct on try ' + (missed.length + 1) : c.retrying ? 'Pick another answer' : 'Not this one', fresh && (c.correct || c.fixed) ? burst() : null));
     if (c.retrying) {                 // a second go at the same question; the first answer is the one that counts for his level
       out.push(h('div', { class: 'row' },
         h('button', { class: 'btn primary', type: 'button', disabled: c.pick2 == null, onclick: checkRetry }, 'Check answer'),
@@ -114,7 +115,8 @@ function viewPracticeBody() {
       out.push(chatBlock(c));
       return [h('div', { class: 'sheet' }, out)];
     }
-    if (moved && t.mode !== 'placement') out.push(h('p', null, moved > 0 ? 'Two in a row. This skill moves up to level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
+    if (moved && t.mode !== 'placement') out.push(h('p', { class: moved > 0 ? 'cheer' + (fresh ? ' pop' : '') : '' }, moved > 0 ? 'Level up. ' + SK[t.skill].name + ' is now level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
+    if (c.setDone) out.push(h('p', { class: 'cheer' + (fresh ? ' pop' : '') }, "Today's set is done. Nice work."));
     if (c.correct) {
       out.push(h('div', { class: 'row' },
         h('button', { class: 'btn quiet', type: 'button', 'aria-pressed': c.reason === 'guess' ? 'true' : 'false', onclick: () => setFeedback({ reason: c.reason === 'guess' ? null : 'guess' }) }, 'I guessed this one'),
