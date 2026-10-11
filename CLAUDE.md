@@ -35,6 +35,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 - Learner state is one document at `data/users/<id>/state`, mirrored to `localStorage` as a fallback. It includes topics a parent added (`custom`).
 - Each answered problem is appended to `data/users/<id>/log/attempts`. Nothing reads this log yet.
 - Tutor chats are not saved.
+- Learner state also holds `days` (problems answered per local day, about four months) and `goals` (daily and weekly). The daily set, the weekly total and the streak are read from `days`.
 - A mock test in progress or just finished is one document at `data/users/<id>/mock`, also mirrored to `localStorage`. The last 20 results are kept in learner state as `mocks`.
 
 ## Skill map conventions
@@ -53,5 +54,7 @@ There is no test suite yet. Changes have been checked with a headless browser an
 ## Working agreement
 
 - One change per branch, with a pull request into `main`. Do not push to `main` directly.
+- The look is the workbook: squared paper, navy ink, the yellow highlighter. Progress borrows a training log's content (best mock test, weekly goal, practice days, streak). Celebrations stay short, play once, and respect reduced motion. No points, XP or mascot.
+- The student's navigation is Home, Practice, Mock test, Progress. Parent settings live behind the footer link.
 - Keep user-facing copy plain and short. The reader is 10 or 11 years old. Use American spelling (practice, color).
 - The page must work at phone width. It uses one light look in every viewer theme, by the owner's choice, with all colors taken from the tokens at the top of the stylesheet.
