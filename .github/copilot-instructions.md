@@ -13,6 +13,6 @@ When reviewing a pull request, check these first:
 7. **Bounded Claude calls.** No retry loops, no calls on a timer, and a limit on drafts and call time.
 8. **State changes are saved and backward compatible.** New fields in learner state need a default in `newState` and must tolerate older saved documents.
 9. **Leveling logic.** Changes to `applyResult`, `pickNext`, `nextTarget` or `advance` should state the intended behavior, since there are no automated tests.
-10. **Accessibility and layout.** Controls need labels and visible focus, colors must come from the theme tokens, and nothing may overflow at 400px width.
+10. **Accessibility and layout.** Controls need labels and visible focus, colors must come from the tokens on `:root` (the page is light only, by choice), and nothing may overflow at 400px width.
 
 Prefer specific, verifiable comments over style suggestions. This project has no build tooling beyond `build.py` and no framework, by design.
