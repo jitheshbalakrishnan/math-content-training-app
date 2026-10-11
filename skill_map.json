@@ -1,11 +1,68 @@
 {
-  "version": "0.2-draft",
+  "version": "0.4-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
     "kangaroo": {
       "name": "Math Kangaroo, Levels 5-6 (Benjamin)",
-      "format_note": "Multiple choice with 3, 4 and 5 point tiers. Confirm question count and time limit against the official rules."
+      "format_note": "Recent grades 5-6 papers have 30 multiple-choice questions with five options: questions 1-10 are worth 3 points, 11-20 are worth 4 and 21-30 are worth 5. Time limit still to confirm against the official rules.",
+      "style": {
+        "source_note": "Written in our own words after studying published Math Kangaroo grades 5-6 papers. No contest problem is copied here; the examples below are original.",
+        "rules": [
+          "Keep it short: one to three sentences, ending in one clear question.",
+          "Use a concrete, slightly playful setting with a named person or animal and everyday objects.",
+          "Reward an idea, not long calculation: small numbers that can be handled mentally.",
+          "Favor these question shapes: which option is impossible, the smallest or largest possible value, at least how many, which statement must be true, working backwards from a total, or a newly defined term applied to cases.",
+          "Give five short choices. Put numeric choices in increasing order, close together or evenly spaced, so guessing by size does not work.",
+          "In the solution, lead with the key idea, then the steps. Where natural, say why the most tempting wrong choice fails."
+        ],
+        "tiers": {
+          "3": "one or two steps of direct reasoning that a careful reader gets quickly.",
+          "4": "two conditions to combine, or a process to track over several steps.",
+          "5": "short to state, but needs a case analysis, a parity or counting argument, or an extreme-case idea."
+        },
+        "examples": [
+          {
+            "points": 3,
+            "question": "Otto reads 3 pages of his comic every morning and 5 pages every evening. He starts on Monday morning. On which day does he read page 30?",
+            "choices": [
+              "Tuesday",
+              "Wednesday",
+              "Thursday",
+              "Friday",
+              "Saturday"
+            ],
+            "answer": 2,
+            "idea": "He reads 8 pages a day, so pages 25 to 32 fall on the fourth day."
+          },
+          {
+            "points": 4,
+            "question": "A lighthouse flashes red every 6 seconds and green every 10 seconds. Both flash together at midnight. How many times do they flash together during the next 100 seconds?",
+            "choices": [
+              "2",
+              "3",
+              "4",
+              "6",
+              "10"
+            ],
+            "answer": 1,
+            "idea": "They coincide every 30 seconds: at 30, 60 and 90 seconds."
+          },
+          {
+            "points": 5,
+            "question": "Five friends meet and some of them shake hands. Ana shakes 4 hands, Ben 3, Cleo 2 and Dev 1. How many hands does Eli shake?",
+            "choices": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4"
+            ],
+            "answer": 2,
+            "idea": "Ana shakes everyone's hand, so Dev's only handshake is with Ana. Ben's other two must be Cleo and Eli, which completes Cleo's two. Eli shakes hands with Ana and Ben."
+          }
+        ]
+      }
     },
     "imc": {
       "name": "International Math Contest (IMC)",
@@ -73,7 +130,10 @@
         "1": "Compare or simplify a single fraction",
         "3": "Add, subtract or take a fraction of a quantity in context",
         "5": "Chained fraction-of-remainder problems or comparing several unlike fractions"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "number.decimals",
@@ -125,7 +185,10 @@
         "1": "Find 10%, 25% or 50% of a quantity",
         "3": "Find what percent one quantity is of another",
         "5": "Successive percent changes or finding the original amount"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "algebra.balance_equations",
@@ -157,7 +220,10 @@
         "1": "Continue a simple number or shape pattern",
         "3": "Find a far term in a repeating or growing pattern",
         "5": "Two interleaved rules or a pattern whose rule must be discovered from a figure"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "algebra.substitution_puzzles",
@@ -206,7 +272,10 @@
         "1": "Perimeter of a rectangle or simple polygon",
         "3": "Perimeter of an L-shape or figure with missing side lengths",
         "5": "Perimeter of a figure built from overlapping or rearranged pieces"
-      }
+      },
+      "figures": [
+        "shape"
+      ]
     },
     {
       "id": "geometry.area_rect_tri",
@@ -223,7 +292,11 @@
         "1": "Area of one rectangle or right triangle",
         "3": "Composite figure split into rectangles and triangles",
         "5": "Shaded-region problems needing subtraction or a clever rearrangement"
-      }
+      },
+      "figures": [
+        "shape",
+        "grid"
+      ]
     },
     {
       "id": "geometry.volume_rect_solids",
@@ -268,7 +341,10 @@
         "1": "Read or plot a point on a grid",
         "3": "Follow a sequence of moves and report the end position",
         "5": "Find a missing vertex or area of a shape drawn on a grid"
-      }
+      },
+      "figures": [
+        "shape"
+      ]
     },
     {
       "id": "geometry.transformations",
@@ -284,7 +360,10 @@
         "1": "Pick the mirror image of a simple shape",
         "3": "Result of a quarter or half turn, or a fold-and-cut",
         "5": "Combined reflections and rotations, or net and cube orientation puzzles"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "logic.truth_liar",
@@ -315,7 +394,10 @@
         "1": "Elapsed time or day of the week a few days later",
         "3": "Day of the week many days later, or a clock running fast or slow",
         "5": "Month-length and weekday counting, or clock-hand angle reasoning"
-      }
+      },
+      "figures": [
+        "clock"
+      ]
     },
     {
       "id": "logic.ordering_ranking",
@@ -459,7 +541,10 @@
         "1": "Convert between hours, minutes and seconds",
         "3": "Add or subtract times across the hour or across noon",
         "5": "Multi-step schedule problem mixing units and durations"
-      }
+      },
+      "figures": [
+        "clock"
+      ]
     },
     {
       "id": "measure.length",
@@ -523,7 +608,11 @@
         "1": "Read one value from a table, bar graph or pictograph",
         "3": "Compare or combine values across categories",
         "5": "Answer a multi-step question from a graph with a scale or missing entry"
-      }
+      },
+      "figures": [
+        "bars",
+        "table"
+      ]
     },
     {
       "id": "data.averages",
@@ -539,7 +628,11 @@
         "1": "Find the mean of a short list of numbers",
         "3": "Find a missing value given the mean",
         "5": "See how the mean changes when a value is added or removed"
-      }
+      },
+      "figures": [
+        "bars",
+        "table"
+      ]
     }
   ]
 }
