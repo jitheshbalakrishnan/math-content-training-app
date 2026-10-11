@@ -423,19 +423,25 @@ function verifyPrompt(p) {
     'Reply with only JSON: {"work":"your brief working","answer":"A"} where "answer" is exactly one capital letter A, B, C, D or E, or the word none.',
   ].join('\n');
 }
-// Which choice an "answer" value points at. Tolerates the shapes a model actually returns:
-// 2, "2", "C", "(C)", "C) 12", or the text of a choice. Returns -1 when it cannot tell.
-function answerIndex(a, choices) {
-  if (Number.isInteger(a)) return a >= 0 && a <= 4 ? a : -1;
+// Which choice an "answer" value points at, or -1 when it cannot tell. The two prompts ask for different
+// formats, so the same reply can mean different things: the writer is asked for a 0-based position, the
+// checker for a letter. Each documented format is read first for its source; the text of a choice and a
+// letter with trailing text ("C) 13") are fallbacks.
+function answerIndex(a, choices, from) {
+  const writer = from === 'writer';
+  if (writer && Number.isInteger(a)) return a >= 0 && a <= 4 ? a : -1;
   const t = String(a == null ? '' : a).trim();
   if (!t) return -1;
+  if (writer && /^[0-4]$/.test(t)) return +t;
+  const bare = t.match(/^\(?([A-Ea-e])\)?[).:]?$/);              // a letter on its own, e.g. C, (c), C.
+  if (bare) return LETTERS.indexOf(bare[1].toUpperCase());
   const byText = choices.findIndex(c => c.toLowerCase() === t.toLowerCase());
   if (byText >= 0) return byText;
-  if (/^[0-4]$/.test(t)) return +t;
-  const m = t.match(/^\(?([A-Ea-e])\)?(?:[).:\s]|$)/);
-  return m ? LETTERS.indexOf(m[1].toUpperCase()) : -1;
+  const lead = t.match(/^\(?([A-Ea-e])[).:]\s/);                 // a labeled choice, e.g. "C) 13"
+  return lead ? LETTERS.indexOf(lead[1].toUpperCase()) : -1;
 }
-const asText = v => (Array.isArray(v) ? v.map(x => String(x).trim()).filter(Boolean).join('\n') : typeof v === 'string' ? v : '').trim();
+// Text given as a string, or as a list of strings or numbers (models return numbered steps that way). Anything else is empty.
+const asText = v => (Array.isArray(v) ? (v.every(x => typeof x === 'string' || typeof x === 'number') ? v.map(x => String(x).trim()).filter(Boolean).join('\n') : '') : typeof v === 'string' ? v : '').trim();
 // Returns the cleaned problem, or { fault } saying why the draft cannot be used.
 function cleanProblem(p, sk) {
   if (!p || typeof p !== 'object') return { fault: 'the draft was not a problem object' };
@@ -446,7 +452,7 @@ function cleanProblem(p, sk) {
   const choices = p.choices.map(c => String(c).replace(/^\s*\(?[A-E][).:]\s+/, '').trim());
   if (choices.some(c => !c)) return { fault: 'a choice was empty' };
   if (new Set(choices).size !== 5) return { fault: 'two choices were the same' };
-  const answer = answerIndex(p.answer, choices);
+  const answer = answerIndex(p.answer, choices, 'writer');
   if (answer < 0) return { fault: 'the draft\'s answer "' + String(p.answer).slice(0, 20) + '" did not point at a choice' };
   const hints = Array.isArray(p.hints) ? p.hints.map(String).filter(Boolean).slice(0, 3) : [];
   let figure = null, choice_figures = null;
@@ -479,7 +485,7 @@ async function makeProblem(skillId, level) {
     try { v = await ask(verifyPrompt(p)); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
     const said = String((v && v.answer) == null ? '' : v.answer).trim();
-    const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices);
+    const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
     if (got === p.answer) return p;
     why.push(got < 0 ? 'the checker answered "' + said.slice(0, 20) + '", so no single choice was confirmed' : 'the writer said ' + LETTERS[p.answer] + ' and the checker said ' + LETTERS[got]);
   }
@@ -497,7 +503,7 @@ function errCopy(e) {
   if (c === 'not_granted') return "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu, then try again.";
   if (c === 'rate_limited') return 'Too many requests right now. Wait a minute, then try again.';
   if (c === 'cancelled') return 'That problem took too long to write, so it was stopped. Try again.';
-  if (c === 'unverified') return 'Two drafts of this problem failed the answer check, so neither was shown.';
+  if (c === 'unverified') return 'Two drafts of this problem could not be used, so neither was shown.';
   return "Couldn't write a problem this time. Try again.";
 }
 
@@ -542,7 +548,7 @@ async function loadProblem() {
     render();
   }
 }
-const STAGE_TEXT = { write: 'Writing a problem', check: 'Checking its answer', redo: 'The first draft failed the check. Writing another', recheck: 'Checking the second draft' };
+const STAGE_TEXT = { write: 'Writing a problem', check: 'Checking its answer', redo: 'The first draft could not be used. Writing another', recheck: 'Checking the second draft' };
 function waitText() {
   const secs = Math.round((Date.now() - cur.since) / 1000);
   return (STAGE_TEXT[stage.get(cur.target.skill + '@' + cur.target.level)] || STAGE_TEXT.write) + ' (' + secs + ' s)';
