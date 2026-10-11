@@ -1,5 +1,5 @@
 {
-  "version": "0.5-draft",
+  "version": "0.6-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
@@ -62,11 +62,18 @@
             "idea": "Ana shakes everyone's hand, so Dev's only handshake is with Ana. Ben's other two must be Cleo and Eli, which completes Cleo's two. Eli shakes hands with Ana and Ben."
           }
         ]
-      }
+      },
+      "short": "Math Kangaroo"
     },
     "imc": {
       "name": "International Math Contest (IMC)",
-      "format_note": "Organizer, grade level, question count and time limit still to confirm."
+      "format_note": "Organizer, grade level, question count and time limit still to confirm.",
+      "short": "International Math Contest"
+    },
+    "olympiad": {
+      "name": "Math Olympiad, grades 5-6",
+      "short": "Math Olympiad",
+      "format_note": "Topics come from a syllabus the owner supplied under the name MOEMS. Its content (HCF and LCM, profit and loss, simple interest, coding-decoding, blood relations, mirror and water images) reads like a class 6 olympiad syllabus such as SOF IMO, not like MOEMS, which publishes no fixed syllabus. Which contest this is, and its paper format, are still to confirm."
     }
   },
   "topics": [
@@ -106,7 +113,8 @@
       "topic": "number",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [],
       "levels": {
@@ -121,7 +129,8 @@
       "topic": "number",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -141,7 +150,8 @@
       "topic": "number",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -157,7 +167,8 @@
       "name": "Divisibility rules",
       "topic": "number",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops",
@@ -175,7 +186,8 @@
       "topic": "number",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.fractions",
@@ -195,7 +207,8 @@
       "name": "Balancing equations",
       "topic": "algebra",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -211,7 +224,8 @@
       "name": "Patterns and sequence rules",
       "topic": "algebra",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -263,7 +277,8 @@
       "topic": "geometry",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -283,7 +298,8 @@
       "topic": "geometry",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "geometry.perimeter"
@@ -304,7 +320,8 @@
       "topic": "geometry",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "geometry.area_rect_tri"
@@ -320,7 +337,8 @@
       "name": "Lines, rays and angles",
       "topic": "geometry",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [],
       "levels": {
@@ -351,7 +369,8 @@
       "name": "Reflections and rotations",
       "topic": "geometry",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [
         "geometry.coordinate_grid"
@@ -404,7 +423,8 @@
       "name": "Ordering and ranking clues",
       "topic": "logic",
       "contests": [
-        "kangaroo"
+        "kangaroo",
+        "olympiad"
       ],
       "prerequisites": [],
       "levels": {
@@ -435,7 +455,8 @@
       "topic": "word",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.fractions"
@@ -452,7 +473,8 @@
       "topic": "word",
       "contests": [
         "kangaroo",
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "word.rates"
@@ -502,7 +524,8 @@
       "name": "Number system and place value",
       "topic": "number",
       "contests": [
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [],
       "levels": {
@@ -516,7 +539,8 @@
       "name": "Factors and multiples",
       "topic": "number",
       "contests": [
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -599,7 +623,8 @@
       "name": "Data handling",
       "topic": "data",
       "contests": [
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.whole_ops"
@@ -619,7 +644,8 @@
       "name": "Averages",
       "topic": "data",
       "contests": [
-        "imc"
+        "imc",
+        "olympiad"
       ],
       "prerequisites": [
         "number.fractions"
@@ -633,6 +659,307 @@
         "bars",
         "table"
       ]
+    },
+    {
+      "id": "number.roman_numerals",
+      "name": "Roman numerals",
+      "topic": "number",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.place_value"
+      ],
+      "levels": {
+        "1": "Read or write a Roman numeral up to 39",
+        "3": "Convert numbers up to 1000 and spot an invalid numeral",
+        "5": "Compare or do arithmetic with numerals that use subtractive pairs"
+      }
+    },
+    {
+      "id": "number.primes",
+      "name": "Primes and prime factorization",
+      "topic": "number",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.factors_multiples"
+      ],
+      "levels": {
+        "1": "Decide whether a small number is prime or composite",
+        "3": "Write a number as a product of primes, or test whether two numbers are co-prime",
+        "5": "Use prime factorization to count factors or find a number from its factor clues"
+      }
+    },
+    {
+      "id": "number.integers",
+      "name": "Integers and negative numbers",
+      "topic": "number",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Place or compare integers on a number line",
+        "3": "Add and subtract integers, including a negative result",
+        "5": "Multi-step change problems with temperatures, floors or scores crossing zero"
+      }
+    },
+    {
+      "id": "number.ratio_proportion",
+      "name": "Ratio and proportion",
+      "topic": "number",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.fractions"
+      ],
+      "levels": {
+        "1": "Write or simplify a ratio of two quantities",
+        "3": "Share a quantity in a given ratio, or solve by the unitary method",
+        "5": "Combine two ratios, or find a quantity after a ratio changes"
+      }
+    },
+    {
+      "id": "algebra.expressions_equations",
+      "name": "Algebraic expressions and simple equations",
+      "topic": "algebra",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "algebra.balance_equations"
+      ],
+      "levels": {
+        "1": "Evaluate an expression for a given value, or name its terms and coefficients",
+        "3": "Write an expression from words and solve a one-variable linear equation",
+        "5": "Set up and solve an equation from a word problem with the unknown on both sides"
+      }
+    },
+    {
+      "id": "geometry.shapes_properties",
+      "name": "Triangles, polygons and solids",
+      "topic": "geometry",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "geometry.lines_angles"
+      ],
+      "levels": {
+        "1": "Classify a triangle or name a polygon from its sides",
+        "3": "Use angle-sum or side properties to find a missing angle or decide which shape fits",
+        "5": "Count faces, edges and vertices of a solid, or reason from several shape properties at once"
+      }
+    },
+    {
+      "id": "geometry.symmetry",
+      "name": "Line and rotational symmetry",
+      "topic": "geometry",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Say whether a shape has a line of symmetry",
+        "3": "Count lines of symmetry, or find the order of rotational symmetry",
+        "5": "Shade the fewest cells so a pattern becomes symmetric, or combine line and rotational symmetry"
+      },
+      "figures": [
+        "grid"
+      ]
+    },
+    {
+      "id": "geometry.constructions",
+      "name": "Ruler and compass constructions",
+      "topic": "geometry",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "geometry.lines_angles"
+      ],
+      "levels": {
+        "1": "Name the tool or first step for a basic construction",
+        "3": "Order the steps to construct a 60 degree angle or a perpendicular bisector",
+        "5": "Reason about what a construction guarantees, such as equal distances from the bisector"
+      }
+    },
+    {
+      "id": "geometry.circles",
+      "name": "Circles: circumference and area",
+      "topic": "geometry",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "geometry.area_rect_tri"
+      ],
+      "levels": {
+        "1": "Relate radius and diameter, or name the parts of a circle",
+        "3": "Find circumference or area from the radius, using 22/7 or 3.14",
+        "5": "Area or perimeter of a figure built from circles, semicircles and rectangles"
+      }
+    },
+    {
+      "id": "data.mode_range",
+      "name": "Mode and range",
+      "topic": "data",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "data.averages"
+      ],
+      "levels": {
+        "1": "Find the mode or the range of a short list",
+        "3": "Find mean, mode and range of the same data and compare them",
+        "5": "Find a missing value from a given mode, range or mean"
+      },
+      "figures": [
+        "table",
+        "bars"
+      ]
+    },
+    {
+      "id": "word.profit_loss",
+      "name": "Profit and loss",
+      "topic": "word",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.percent"
+      ],
+      "levels": {
+        "1": "Find profit or loss from cost price and selling price",
+        "3": "Find profit or loss as a percentage of cost price",
+        "5": "Find cost price or selling price from a percentage, or track two sales in a row"
+      }
+    },
+    {
+      "id": "word.simple_interest",
+      "name": "Simple interest",
+      "topic": "word",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.percent"
+      ],
+      "levels": {
+        "1": "Find the interest for one year at a given rate",
+        "3": "Find simple interest or the total amount over several years",
+        "5": "Find the rate, time or principal from the other three"
+      }
+    },
+    {
+      "id": "logic.alphabet_series",
+      "name": "Number and alphabet series",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "algebra.patterns_sequences"
+      ],
+      "levels": {
+        "1": "Continue a letter series with a fixed skip",
+        "3": "Find the missing term in a series mixing letters and numbers",
+        "5": "Find the wrong term, or a series with two alternating rules"
+      }
+    },
+    {
+      "id": "logic.coding_decoding",
+      "name": "Coding and decoding",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Decode a word when each letter moves a fixed number of places",
+        "3": "Work out the rule from one coded word and apply it to another",
+        "5": "Codes that use number values of letters or a rule that changes by position"
+      }
+    },
+    {
+      "id": "logic.analogy_odd_one_out",
+      "name": "Analogy and odd one out",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Pick the odd one out from five numbers or words",
+        "3": "Complete a number or word analogy",
+        "5": "Find the odd one out where two rules look plausible and only one fits all the others"
+      }
+    },
+    {
+      "id": "logic.cubes_dice",
+      "name": "Cubes and dice",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "geometry.volume_rect_solids"
+      ],
+      "levels": {
+        "1": "Use opposite faces of a standard die adding to 7",
+        "3": "Find the face opposite a given face from two views described in words",
+        "5": "Count small cubes with 0, 1, 2 or 3 painted faces after a painted cube is cut"
+      }
+    },
+    {
+      "id": "logic.direction_sense",
+      "name": "Direction sense",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Follow two turns and say which way someone faces",
+        "3": "Follow a walk with several legs and find the distance or direction from the start",
+        "5": "Walks with turns given as left and right from a changing heading, or two walkers"
+      }
+    },
+    {
+      "id": "logic.blood_relations",
+      "name": "Family relationship puzzles",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Name the relationship from one statement",
+        "3": "Chain two or three statements to find how two people are related",
+        "5": "Coded relationships, or a family of six with several clues"
+      }
+    },
+    {
+      "id": "logic.venn_diagrams",
+      "name": "Venn diagram reasoning",
+      "topic": "logic",
+      "contests": [
+        "olympiad"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Read how many belong to one group from a two-group description",
+        "3": "Find how many belong to both or neither of two groups",
+        "5": "Three overlapping groups with several counts given"
+      }
     }
   ]
 }
