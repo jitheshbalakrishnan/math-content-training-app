@@ -51,5 +51,5 @@ There is no test suite yet. Changes have been checked with a headless browser an
 ## Working agreement
 
 - One change per branch, with a pull request into `main`. Do not push to `main` directly.
-- Keep user-facing copy plain and short. The reader is 10 or 11 years old.
+- Keep user-facing copy plain and short. The reader is 10 or 11 years old. Use American spelling (practice, color).
 - The page must work at phone width. It uses one light look in every viewer theme, by the owner's choice, with all colors taken from the tokens at the top of the stylesheet.
