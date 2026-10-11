@@ -65,7 +65,9 @@ function check() {
   if (c.picked == null || c.checked) return;
   c.checked = true; c.correct = c.picked === c.p.answer; c.ms = Date.now() - c.t0;
   c.before = clone(skillState(id));
+  const goal = goals().day, soFar = doneToday();
   tally(1, c.correct ? 1 : 0);
+  c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
