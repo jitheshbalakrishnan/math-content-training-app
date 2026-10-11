@@ -174,7 +174,7 @@ let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
 const env = { ready: false, sample: null, db: null, base: null };
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [] }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick' }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -509,10 +509,12 @@ function cleanProblem(p, sk, n) {
 }
 const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after this long
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
+// The hosted page can only pick a tier, not a named model. 'quick' is the fast, small tier; 'default' is slower and stronger.
+function writerTier() { return S.tier === 'default' ? 'default' : 'quick'; }
 function ask(prompt, outer) {         // one Claude call, stopped by its time limit or by the caller's signal
   const ctl = new AbortController(), stop = () => ctl.abort(), timer = setTimeout(stop, CALL_LIMIT_MS);
   if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', stop); }
-  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
+  return env.sample.json(prompt, { cache: false, signal: ctl.signal, modelTier: writerTier() }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
 }
 async function makeProblem(skillId, level, signal) {
   const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [], n = choiceCount();
@@ -1132,7 +1134,14 @@ function viewParents() {
               h('button', { class: 'btn quiet', type: 'button', onclick: () => { removing = null; render(); } }, 'Keep it'))
           : h('button', { class: 'btn quiet', type: 'button', onclick: () => { removing = s.id; render(); } }, 'Remove'));
     })) : h('p', { class: 'muted' }, 'None yet. A topic you add shows up here, in Progress, and in his practice within a few problems.'));
-  const check = h('div', { class: 'sheet' }, h('h3', null, 'Answer checking'),
+  const check = h('div', { class: 'sheet' }, h('h3', null, 'Problem writing'),
+    h('div', { class: 'field' }, h('label', { for: 'pt-tier' }, 'Which Claude writes the problems'),
+      h('select', { id: 'pt-tier', onchange: ev => { S.tier = ev.target.value === 'default' ? 'default' : 'quick'; dropPrepared(); saveState(); render(); } },
+        h('option', { value: 'quick', selected: writerTier() === 'quick' }, 'Fast (the small, quick model)'),
+        h('option', { value: 'default', selected: writerTier() === 'default' }, 'Careful (the standard model, slower)'))),
+    h('p', { class: 'muted small' }, writerTier() === 'quick'
+      ? 'Fast. Problems appear in seconds and use less of your Claude usage. The small model makes more mistakes, so wrong answer keys are more likely, especially on harder levels.'
+      : 'Careful. Problems take longer and use more of your Claude usage, with fewer mistakes.'),
     h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-verify', checked: !!S.verify, onchange: ev => { S.verify = ev.target.checked; dropPrepared(); saveState(); render(); } }), 'Solve each problem a second time before showing it'),
     h('p', { class: 'muted small' }, S.verify
       ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
