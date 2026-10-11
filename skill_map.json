@@ -1,5 +1,5 @@
 {
-  "version": "0.3-draft",
+  "version": "0.4-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
@@ -130,7 +130,10 @@
         "1": "Compare or simplify a single fraction",
         "3": "Add, subtract or take a fraction of a quantity in context",
         "5": "Chained fraction-of-remainder problems or comparing several unlike fractions"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "number.decimals",
@@ -182,7 +185,10 @@
         "1": "Find 10%, 25% or 50% of a quantity",
         "3": "Find what percent one quantity is of another",
         "5": "Successive percent changes or finding the original amount"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "algebra.balance_equations",
@@ -214,7 +220,10 @@
         "1": "Continue a simple number or shape pattern",
         "3": "Find a far term in a repeating or growing pattern",
         "5": "Two interleaved rules or a pattern whose rule must be discovered from a figure"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "algebra.substitution_puzzles",
@@ -263,7 +272,10 @@
         "1": "Perimeter of a rectangle or simple polygon",
         "3": "Perimeter of an L-shape or figure with missing side lengths",
         "5": "Perimeter of a figure built from overlapping or rearranged pieces"
-      }
+      },
+      "figures": [
+        "shape"
+      ]
     },
     {
       "id": "geometry.area_rect_tri",
@@ -280,7 +292,11 @@
         "1": "Area of one rectangle or right triangle",
         "3": "Composite figure split into rectangles and triangles",
         "5": "Shaded-region problems needing subtraction or a clever rearrangement"
-      }
+      },
+      "figures": [
+        "shape",
+        "grid"
+      ]
     },
     {
       "id": "geometry.volume_rect_solids",
@@ -325,7 +341,10 @@
         "1": "Read or plot a point on a grid",
         "3": "Follow a sequence of moves and report the end position",
         "5": "Find a missing vertex or area of a shape drawn on a grid"
-      }
+      },
+      "figures": [
+        "shape"
+      ]
     },
     {
       "id": "geometry.transformations",
@@ -341,7 +360,10 @@
         "1": "Pick the mirror image of a simple shape",
         "3": "Result of a quarter or half turn, or a fold-and-cut",
         "5": "Combined reflections and rotations, or net and cube orientation puzzles"
-      }
+      },
+      "figures": [
+        "grid"
+      ]
     },
     {
       "id": "logic.truth_liar",
@@ -372,7 +394,10 @@
         "1": "Elapsed time or day of the week a few days later",
         "3": "Day of the week many days later, or a clock running fast or slow",
         "5": "Month-length and weekday counting, or clock-hand angle reasoning"
-      }
+      },
+      "figures": [
+        "clock"
+      ]
     },
     {
       "id": "logic.ordering_ranking",
@@ -516,7 +541,10 @@
         "1": "Convert between hours, minutes and seconds",
         "3": "Add or subtract times across the hour or across noon",
         "5": "Multi-step schedule problem mixing units and durations"
-      }
+      },
+      "figures": [
+        "clock"
+      ]
     },
     {
       "id": "measure.length",
@@ -580,7 +608,11 @@
         "1": "Read one value from a table, bar graph or pictograph",
         "3": "Compare or combine values across categories",
         "5": "Answer a multi-step question from a graph with a scale or missing entry"
-      }
+      },
+      "figures": [
+        "bars",
+        "table"
+      ]
     },
     {
       "id": "data.averages",
@@ -596,7 +628,11 @@
         "1": "Find the mean of a short list of numbers",
         "3": "Find a missing value given the mean",
         "5": "See how the mean changes when a value is added or removed"
-      }
+      },
+      "figures": [
+        "bars",
+        "table"
+      ]
     }
   ]
 }
