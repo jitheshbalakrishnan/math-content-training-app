@@ -420,25 +420,52 @@ function verifyPrompt(p) {
     ...(p.figure ? ['The figure, which the student sees drawn from this data: ' + figText(p.figure)] : []),
     'Choices:', ...p.choices.map((c, i) => LETTERS[i] + ') ' + (p.choice_figures ? figText(p.choice_figures[i]) : c)),
     'If no choice is correct, more than one is correct, or the problem is ambiguous or cannot be solved without a picture, answer "none".',
-    'Reply with only JSON: {"work":"your brief working","answer":"A"} where answer is A, B, C, D, E or none.',
+    'Reply with only JSON: {"work":"your brief working","answer":"A"} where "answer" is exactly one capital letter A, B, C, D or E, or the word none.',
   ].join('\n');
 }
+// Which choice an "answer" value points at, or -1 when it cannot tell. The two prompts ask for different
+// formats, so the same reply can mean different things: the writer is asked for a 0-based position, the
+// checker for a letter. Each documented format is read first for its source; the text of a choice and a
+// letter with trailing text ("C) 13") are fallbacks.
+function answerIndex(a, choices, from) {
+  const writer = from === 'writer';
+  if (writer && Number.isInteger(a)) return a >= 0 && a <= 4 ? a : -1;
+  const t = String(a == null ? '' : a).trim();
+  if (!t) return -1;
+  if (writer && /^[0-4]$/.test(t)) return +t;
+  const bare = t.match(/^\(?([A-Ea-e])\)?[).:]?$/);              // a letter on its own, e.g. C, (c), C.
+  if (bare) return LETTERS.indexOf(bare[1].toUpperCase());
+  const byText = choices.findIndex(c => c.toLowerCase() === t.toLowerCase());
+  if (byText >= 0) return byText;
+  const lead = t.match(/^\(?([A-Ea-e])[).:]\s/);                 // a labeled choice, e.g. "C) 13"
+  return lead ? LETTERS.indexOf(lead[1].toUpperCase()) : -1;
+}
+// Text given as a string, or as a list of strings or numbers (models return numbered steps that way). Anything else is empty.
+const asText = v => (Array.isArray(v) ? (v.every(x => typeof x === 'string' || typeof x === 'number') ? v.map(x => String(x).trim()).filter(Boolean).join('\n') : '') : typeof v === 'string' ? v : '').trim();
+// Returns the cleaned problem, or { fault } saying why the draft cannot be used.
 function cleanProblem(p, sk) {
-  if (!p || typeof p.question !== 'string' || !Array.isArray(p.choices) || p.choices.length !== 5) return null;
-  if (!Number.isInteger(p.answer) || p.answer < 0 || p.answer > 4 || typeof p.solution !== 'string') return null;
+  if (!p || typeof p !== 'object') return { fault: 'the draft was not a problem object' };
+  const question = asText(p.question), solution = asText(p.solution);
+  if (!question) return { fault: 'the draft had no question' };
+  if (!solution) return { fault: 'the draft had no solution' };
+  if (!Array.isArray(p.choices) || p.choices.length !== 5) return { fault: 'the draft did not have exactly 5 choices' };
   const choices = p.choices.map(c => String(c).replace(/^\s*\(?[A-E][).:]\s+/, '').trim());
-  if (new Set(choices).size !== 5 || choices.some(c => !c)) return null;
+  if (choices.some(c => !c)) return { fault: 'a choice was empty' };
+  if (new Set(choices).size !== 5) return { fault: 'two choices were the same' };
+  const answer = answerIndex(p.answer, choices, 'writer');
+  if (answer < 0) return { fault: 'the draft\'s answer "' + String(p.answer).slice(0, 20) + '" did not point at a choice' };
   const hints = Array.isArray(p.hints) ? p.hints.map(String).filter(Boolean).slice(0, 3) : [];
   let figure = null, choice_figures = null;
   if (sk && sk.figures) {             // a figure that fails validation sinks the whole draft, since the problem may depend on it
-    if (p.figure != null && !(figure = validFigure(p.figure, sk.figures))) return null;
+    if (p.figure != null && !(figure = validFigure(p.figure, sk.figures))) return { fault: 'the figure data was not valid' };
     if (p.choice_figures != null) {
-      if (!Array.isArray(p.choice_figures) || p.choice_figures.length !== 5) return null;
+      if (!Array.isArray(p.choice_figures) || p.choice_figures.length !== 5) return { fault: 'there were not exactly 5 picture choices' };
       choice_figures = p.choice_figures.map(f => validFigure(f, PICTURE_CHOICES));
-      if (choice_figures.some(f => !f) || new Set(choice_figures.map(f => JSON.stringify(f))).size !== 5) return null;
+      if (choice_figures.some(f => !f)) return { fault: 'a picture choice was not valid' };
+      if (new Set(choice_figures.map(f => JSON.stringify(f))).size !== 5) return { fault: 'two picture choices were the same' };
     }
   }
-  return { question: p.question.trim(), figure, choice_figures, choices, answer: p.answer, hints, solution: p.solution.trim() };
+  return { question, figure, choice_figures, choices, answer, hints, solution };
 }
 const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after this long
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
@@ -447,20 +474,22 @@ function ask(prompt) {
   return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => clearTimeout(timer));
 }
 async function makeProblem(skillId, level) {
-  const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level;
+  const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [];
   for (let draft = 0; draft < 2; draft++) {            // at most two drafts, then give up and say so
     let p, v;
     stage.set(key, draft ? 'redo' : 'write');
     try { p = cleanProblem(await ask(genPrompt(sk, level, st)), sk); }
-    catch (e) { if (e && e.code === 'invalid_json') continue; throw e; }
-    if (!p) continue;
+    catch (e) { if (e && e.code === 'invalid_json') { why.push('the draft could not be read as data'); continue; } throw e; }
+    if (p.fault) { why.push(p.fault); continue; }
     stage.set(key, draft ? 'recheck' : 'check');
     try { v = await ask(verifyPrompt(p)); }
-    catch (e) { if (e && e.code === 'invalid_json') continue; throw e; }
-    const letter = String((v && v.answer) || '').trim().toUpperCase();
-    if (letter.length === 1 && LETTERS.indexOf(letter) === p.answer) return p;
+    catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
+    const said = String((v && v.answer) == null ? '' : v.answer).trim();
+    const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
+    if (got === p.answer) return p;
+    why.push(got < 0 ? 'the checker answered "' + said.slice(0, 20) + '", so no single choice was confirmed' : 'the writer said ' + LETTERS[p.answer] + ' and the checker said ' + LETTERS[got]);
   }
-  throw { code: 'unverified' };
+  throw { code: 'unverified', why };
 }
 const pre = new Map();
 function fetchProblem(skillId, level) {
@@ -474,7 +503,7 @@ function errCopy(e) {
   if (c === 'not_granted') return "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu, then try again.";
   if (c === 'rate_limited') return 'Too many requests right now. Wait a minute, then try again.';
   if (c === 'cancelled') return 'That problem took too long to write, so it was stopped. Try again.';
-  if (c === 'unverified') return "Two problems failed the answer check, so neither was shown. Try again for a new one.";
+  if (c === 'unverified') return 'Two drafts of this problem could not be used, so neither was shown.';
   return "Couldn't write a problem this time. Try again.";
 }
 
@@ -503,7 +532,14 @@ async function loadProblem() {
     cur = { target: t, p, picked: null, checked: false, hints: 0, t0: Date.now(), chat: [], chatOpen: false, reason: null, note: '' };
   } catch (e) {
     if (!cur || cur.target !== t) return;
-    cur = { target: t, error: errCopy(e) };
+    cur = { target: t, error: errCopy(e), why: e && e.why };
+    if (e && e.code === 'unverified' && t.mode === 'placement') {      // do not keep retrying a skill that just failed twice
+      const others = contestSkills().filter(x => x.topic === SK[t.skill].topic && x.id !== t.skill && !S.placement.queue.includes(x.id));
+      if (others.length) {
+        S.placement.queue[S.placement.i] = others[Math.floor(Math.random() * others.length)].id;
+        cur.swapped = true; saveState();
+      }
+    }
   }
   try { render(); }
   catch (e) {                          // a problem that cannot be drawn must not leave the waiting screen up forever
@@ -512,7 +548,7 @@ async function loadProblem() {
     render();
   }
 }
-const STAGE_TEXT = { write: 'Writing a problem', check: 'Checking its answer', redo: 'The first draft failed the check. Writing another', recheck: 'Checking the second draft' };
+const STAGE_TEXT = { write: 'Writing a problem', check: 'Checking its answer', redo: 'The first draft could not be used. Writing another', recheck: 'Checking the second draft' };
 function waitText() {
   const secs = Math.round((Date.now() - cur.since) / 1000);
   return (STAGE_TEXT[stage.get(cur.target.skill + '@' + cur.target.level)] || STAGE_TEXT.write) + ' (' + secs + ' s)';
@@ -665,7 +701,10 @@ function viewPractice() {
     h('p', { class: 'muted small' }, 'Each problem is written, then solved a second time to check the answer. That usually takes under a minute, and longer for problems with figures.'),
     h('div', { class: 'row', id: 'wait-again', hidden: Date.now() - cur.since < 45000 },
       h('span', null, 'Taking a while?'), h('button', { class: 'btn quiet', type: 'button', onclick: loadProblem }, 'Start this one again')))];
-  if (cur.error) return [h('div', { class: 'sheet' }, meta, h('p', null, cur.error), h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Try again')))];
+  if (cur.error) return [h('div', { class: 'sheet' }, meta, h('p', null, cur.error),
+    cur.swapped ? h('p', null, 'The next try uses a different skill from the same topic.') : null,
+    cur.why && cur.why.length ? h('p', { class: 'muted small' }, 'For a grown-up: ' + cur.why.map((w, i) => 'draft ' + (i + 1) + ', ' + w).join('; ') + '.') : null,
+    h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Try again')))];
 
   const c = cur, p = c.p, st = skillState(t.skill);
   const showRight = c.checked && (c.correct || c.revealed);
