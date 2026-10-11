@@ -32,9 +32,24 @@ function viewProgressBody() {
   const list = S.contest ? contestSkills() : [];
   const all = list.map(s => S.skills[s.id]).filter(Boolean);
   const n = all.reduce((a, s) => a + s.n, 0), ok = all.reduce((a, s) => a + s.ok, 0);
+  const erase = () => {               // progress goes; what a parent set up stays
+    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
+    confirmReset = false;
+    S = Object.assign(newState(), keep);
+    syncCustom();
+    if (live) live.abort();
+    if (mock && mock.ctl) mock.ctl.abort();             // a test being written or taken goes too, so it cannot refill the history
+    mock = null; confirmFinish = false; pad.forget(); saveMock();
+    cur = null; dropPrepared(); saveState();
+    location.hash = '#home'; render();
+  };
+  const reset = h('div', { class: 'row' }, confirmReset
+    ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
+    : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
+  const some = (S.mocks && S.mocks.length) || Object.keys(S.days || {}).length;      // anything a reset would clear
   if (!n) return [logTiles(), h('div', { class: 'sheet' }, h('h2', null, 'No skills to show yet'),
     h('p', { class: 'muted' }, 'Answer a few problems and each skill appears here with its level and how many you got right.'),
-    h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set')))];
+    h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set'))), ...(some ? [reset] : [])];
   const reasons = {};
   for (const s of all) for (const k in s.reasons) reasons[k] = (reasons[k] || 0) + s.reasons[k];
   const top = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0];
@@ -53,18 +68,6 @@ function viewProgressBody() {
         st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'),
         h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
-  const erase = () => {               // progress goes; what a parent set up stays
-    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
-    confirmReset = false;
-    S = Object.assign(newState(), keep);
-    syncCustom();
-    if (live) live.abort();
-    cur = null; dropPrepared(); saveState();
-    location.hash = '#home'; render();
-  };
-  const reset = h('div', { class: 'row' }, confirmReset
-    ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
-    : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
   return [logTiles(), head, ...groups, reset];
 }
 

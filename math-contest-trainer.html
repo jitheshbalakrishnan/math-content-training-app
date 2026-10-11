@@ -663,6 +663,7 @@ function nextTarget() {
     }
     if (!S.placement.done) return { skill: S.placement.queue[S.placement.i], level: 3, mode: 'placement' };
   }
+  if (S.retry && !pool.some(x => x.id === S.retry)) S.retry = null;      // a retry from a topic he has since left is dropped
   if (S.retry && SK[S.retry]) return { skill: S.retry, level: skillState(S.retry).level, mode: 'retry' };
   if (!S.planned || !SK[S.planned] || S.planned === S.last || !pool.some(x => x.id === S.planned)) S.planned = pickNext(S.last);
   return { skill: S.planned, level: skillState(S.planned).level, mode: 'practice' };
@@ -863,6 +864,7 @@ function chooseTopic(id) {
 function switchContest(key) {        // change what he is training for without losing progress on any skill
   if (!CONTESTS[key] || key === S.contest) return;
   const placed = S.placement.done;
+  if (mock && mock.phase === 'prep') { mock.ctl.abort(); mock = null; saveMock(); }   // a test being written for the old contest is dropped
   chooseContest(key);                // sets the contest and builds a placement for it
   if (placed) S.placement.done = true;         // already placed once: skills new to him simply start at level 3
   S.focus = null; S.planned = null; S.retry = null;
@@ -1053,9 +1055,24 @@ function viewProgressBody() {
   const list = S.contest ? contestSkills() : [];
   const all = list.map(s => S.skills[s.id]).filter(Boolean);
   const n = all.reduce((a, s) => a + s.n, 0), ok = all.reduce((a, s) => a + s.ok, 0);
+  const erase = () => {               // progress goes; what a parent set up stays
+    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
+    confirmReset = false;
+    S = Object.assign(newState(), keep);
+    syncCustom();
+    if (live) live.abort();
+    if (mock && mock.ctl) mock.ctl.abort();             // a test being written or taken goes too, so it cannot refill the history
+    mock = null; confirmFinish = false; pad.forget(); saveMock();
+    cur = null; dropPrepared(); saveState();
+    location.hash = '#home'; render();
+  };
+  const reset = h('div', { class: 'row' }, confirmReset
+    ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
+    : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
+  const some = (S.mocks && S.mocks.length) || Object.keys(S.days || {}).length;      // anything a reset would clear
   if (!n) return [logTiles(), h('div', { class: 'sheet' }, h('h2', null, 'No skills to show yet'),
     h('p', { class: 'muted' }, 'Answer a few problems and each skill appears here with its level and how many you got right.'),
-    h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set')))];
+    h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set'))), ...(some ? [reset] : [])];
   const reasons = {};
   for (const s of all) for (const k in s.reasons) reasons[k] = (reasons[k] || 0) + s.reasons[k];
   const top = Object.entries(reasons).sort((a, b) => b[1] - a[1])[0];
@@ -1074,18 +1091,6 @@ function viewProgressBody() {
         st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'),
         h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
-  const erase = () => {               // progress goes; what a parent set up stays
-    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
-    confirmReset = false;
-    S = Object.assign(newState(), keep);
-    syncCustom();
-    if (live) live.abort();
-    cur = null; dropPrepared(); saveState();
-    location.hash = '#home'; render();
-  };
-  const reset = h('div', { class: 'row' }, confirmReset
-    ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
-    : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
   return [logTiles(), head, ...groups, reset];
 }
 
@@ -1414,7 +1419,7 @@ function viewParents() {
     h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-verify', checked: !!S.verify, onchange: ev => { S.verify = ev.target.checked; dropPrepared(); saveState(); render(); } }), 'Solve each problem a second time before showing it'),
     h('p', { class: 'muted small' }, S.verify
       ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
-      : 'Off. Problems appear sooner and are never thrown away, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
+      : 'Off. Problems appear sooner and are never thrown away for failing a check, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
   const setGoal = (key, lo, hi) => ev => { const v = Math.round(Number(ev.target.value)); S.goals = Object.assign({}, goals(), { [key]: Math.max(lo, Math.min(hi, v || lo)) }); saveState(); render(); };
   const goal = h('div', { class: 'sheet' }, h('h3', null, 'Goals'),
     h('div', { class: 'row' },

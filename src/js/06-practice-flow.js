@@ -8,6 +8,7 @@ function nextTarget() {
     }
     if (!S.placement.done) return { skill: S.placement.queue[S.placement.i], level: 3, mode: 'placement' };
   }
+  if (S.retry && !pool.some(x => x.id === S.retry)) S.retry = null;      // a retry from a topic he has since left is dropped
   if (S.retry && SK[S.retry]) return { skill: S.retry, level: skillState(S.retry).level, mode: 'retry' };
   if (!S.planned || !SK[S.planned] || S.planned === S.last || !pool.some(x => x.id === S.planned)) S.planned = pickNext(S.last);
   return { skill: S.planned, level: skillState(S.planned).level, mode: 'practice' };

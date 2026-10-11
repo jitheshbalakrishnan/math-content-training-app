@@ -13,6 +13,7 @@ function chooseTopic(id) {
 function switchContest(key) {        // change what he is training for without losing progress on any skill
   if (!CONTESTS[key] || key === S.contest) return;
   const placed = S.placement.done;
+  if (mock && mock.phase === 'prep') { mock.ctl.abort(); mock = null; saveMock(); }   // a test being written for the old contest is dropped
   chooseContest(key);                // sets the contest and builds a placement for it
   if (placed) S.placement.done = true;         // already placed once: skills new to him simply start at level 3
   S.focus = null; S.planned = null; S.retry = null;
