@@ -1,0 +1,545 @@
+{
+  "version": "0.2-draft",
+  "grade_band": "5-6",
+  "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
+  "contests": {
+    "kangaroo": {
+      "name": "Math Kangaroo, Levels 5-6 (Benjamin)",
+      "format_note": "Multiple choice with 3, 4 and 5 point tiers. Confirm question count and time limit against the official rules."
+    },
+    "imc": {
+      "name": "International Math Contest (IMC)",
+      "format_note": "Organizer, grade level, question count and time limit still to confirm."
+    }
+  },
+  "topics": [
+    {
+      "id": "number",
+      "name": "Number Sense and Arithmetic"
+    },
+    {
+      "id": "algebra",
+      "name": "Pre-Algebra and Equations"
+    },
+    {
+      "id": "geometry",
+      "name": "Geometry and Spatial Reasoning"
+    },
+    {
+      "id": "logic",
+      "name": "Logical Deductions and Puzzles"
+    },
+    {
+      "id": "word",
+      "name": "Word Problems"
+    },
+    {
+      "id": "measure",
+      "name": "Measurement"
+    },
+    {
+      "id": "data",
+      "name": "Data and Averages"
+    }
+  ],
+  "skills": [
+    {
+      "id": "number.whole_ops",
+      "name": "Whole number operations",
+      "topic": "number",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Single multi-digit calculation with one operation",
+        "3": "Order of operations or a missing-digit calculation",
+        "5": "Digit puzzles needing place-value reasoning across several constraints"
+      }
+    },
+    {
+      "id": "number.fractions",
+      "name": "Fractions",
+      "topic": "number",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Compare or simplify a single fraction",
+        "3": "Add, subtract or take a fraction of a quantity in context",
+        "5": "Chained fraction-of-remainder problems or comparing several unlike fractions"
+      }
+    },
+    {
+      "id": "number.decimals",
+      "name": "Decimals",
+      "topic": "number",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Order decimals or do one decimal operation",
+        "3": "Mixed decimal and fraction conversion inside a calculation",
+        "5": "Estimation or placement puzzles where decimal points or digits are missing"
+      }
+    },
+    {
+      "id": "number.divisibility",
+      "name": "Divisibility rules",
+      "topic": "number",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "number.whole_ops",
+        "number.factors_multiples"
+      ],
+      "levels": {
+        "1": "Apply one rule (2, 3, 5, 9, 10) to a given number",
+        "3": "Find a missing digit so a number is divisible by a given value",
+        "5": "Combine several rules, factors and remainders in one problem"
+      }
+    },
+    {
+      "id": "number.percent",
+      "name": "Basic percentages",
+      "topic": "number",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.fractions",
+        "number.decimals"
+      ],
+      "levels": {
+        "1": "Find 10%, 25% or 50% of a quantity",
+        "3": "Find what percent one quantity is of another",
+        "5": "Successive percent changes or finding the original amount"
+      }
+    },
+    {
+      "id": "algebra.balance_equations",
+      "name": "Balancing equations",
+      "topic": "algebra",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "One-step missing number in an equation",
+        "3": "Balance-scale picture with two kinds of objects",
+        "5": "Several linked balances that must be combined to compare objects"
+      }
+    },
+    {
+      "id": "algebra.patterns_sequences",
+      "name": "Patterns and sequence rules",
+      "topic": "algebra",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Continue a simple number or shape pattern",
+        "3": "Find a far term in a repeating or growing pattern",
+        "5": "Two interleaved rules or a pattern whose rule must be discovered from a figure"
+      }
+    },
+    {
+      "id": "algebra.substitution_puzzles",
+      "name": "Replacement and substitution puzzles",
+      "topic": "algebra",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "algebra.balance_equations"
+      ],
+      "levels": {
+        "1": "Replace one symbol with a given value and evaluate",
+        "3": "Use one relationship to rewrite and solve another",
+        "5": "Chain of three or more replacements with an indirect question"
+      }
+    },
+    {
+      "id": "algebra.symbol_math",
+      "name": "Symbol math",
+      "topic": "algebra",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "algebra.balance_equations"
+      ],
+      "levels": {
+        "1": "One symbol stands for one unknown number",
+        "3": "Two or three symbols in a small system of sums",
+        "5": "Letter-for-digit arithmetic or a newly defined operation applied repeatedly"
+      }
+    },
+    {
+      "id": "geometry.perimeter",
+      "name": "Perimeter",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Perimeter of a rectangle or simple polygon",
+        "3": "Perimeter of an L-shape or figure with missing side lengths",
+        "5": "Perimeter of a figure built from overlapping or rearranged pieces"
+      }
+    },
+    {
+      "id": "geometry.area_rect_tri",
+      "name": "Area of rectangles and triangles",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "geometry.perimeter"
+      ],
+      "levels": {
+        "1": "Area of one rectangle or right triangle",
+        "3": "Composite figure split into rectangles and triangles",
+        "5": "Shaded-region problems needing subtraction or a clever rearrangement"
+      }
+    },
+    {
+      "id": "geometry.volume_rect_solids",
+      "name": "Volume of rectangular solids",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "geometry.area_rect_tri"
+      ],
+      "levels": {
+        "1": "Volume of a box from its three dimensions",
+        "3": "Count unit cubes in a stacked figure, including hidden ones",
+        "5": "Painted-cube or cut-and-rebuild problems"
+      }
+    },
+    {
+      "id": "geometry.lines_angles",
+      "name": "Lines, rays and angles",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Classify an angle as acute, right or obtuse",
+        "3": "Find a missing angle on a line or in a triangle",
+        "5": "Multi-step angle chase through several shapes"
+      }
+    },
+    {
+      "id": "geometry.coordinate_grid",
+      "name": "Coordinate grids",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Read or plot a point on a grid",
+        "3": "Follow a sequence of moves and report the end position",
+        "5": "Find a missing vertex or area of a shape drawn on a grid"
+      }
+    },
+    {
+      "id": "geometry.transformations",
+      "name": "Reflections and rotations",
+      "topic": "geometry",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "geometry.coordinate_grid"
+      ],
+      "levels": {
+        "1": "Pick the mirror image of a simple shape",
+        "3": "Result of a quarter or half turn, or a fold-and-cut",
+        "5": "Combined reflections and rotations, or net and cube orientation puzzles"
+      }
+    },
+    {
+      "id": "logic.truth_liar",
+      "name": "Truth-teller and liar logic",
+      "topic": "logic",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Two speakers, one statement each",
+        "3": "Three or four speakers with exactly one liar or one truth-teller",
+        "5": "Statements about how many others are lying"
+      }
+    },
+    {
+      "id": "logic.calendar_clock",
+      "name": "Calendar and clock problems",
+      "topic": "logic",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "number.whole_ops",
+        "measure.time"
+      ],
+      "levels": {
+        "1": "Elapsed time or day of the week a few days later",
+        "3": "Day of the week many days later, or a clock running fast or slow",
+        "5": "Month-length and weekday counting, or clock-hand angle reasoning"
+      }
+    },
+    {
+      "id": "logic.ordering_ranking",
+      "name": "Ordering and ranking clues",
+      "topic": "logic",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Order three items from two clues",
+        "3": "Order five items from several clues, or position in a line",
+        "5": "Clues with negatives and conditions that need case checking"
+      }
+    },
+    {
+      "id": "logic.counting_paths_combinations",
+      "name": "Counting paths and combinations",
+      "topic": "logic",
+      "contests": [
+        "kangaroo"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "List all outfits or pairs from small sets",
+        "3": "Count shortest paths on a small grid or arrangements with one restriction",
+        "5": "Counting with several restrictions or overlapping cases"
+      }
+    },
+    {
+      "id": "word.rates",
+      "name": "Rates",
+      "topic": "word",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.fractions"
+      ],
+      "levels": {
+        "1": "Unit rate from a single pair of quantities",
+        "3": "Scale a rate up or down to a new amount",
+        "5": "Combined work or two rates acting together"
+      }
+    },
+    {
+      "id": "word.distance_speed_time",
+      "name": "Distance, speed and time",
+      "topic": "word",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "word.rates"
+      ],
+      "levels": {
+        "1": "Find one of distance, speed or time from the other two",
+        "3": "Two-leg journey or a unit conversion",
+        "5": "Meeting, catching-up or average-speed problems"
+      }
+    },
+    {
+      "id": "word.age",
+      "name": "Age problems",
+      "topic": "word",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "algebra.balance_equations"
+      ],
+      "levels": {
+        "1": "Age a few years ago or from now",
+        "3": "Two people with a sum or difference of ages",
+        "5": "Ages related at two different points in time"
+      }
+    },
+    {
+      "id": "word.multi_step",
+      "name": "Multi-step real-world problems",
+      "topic": "word",
+      "contests": [
+        "kangaroo",
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Two-step problem with money or measurement",
+        "3": "Three or four steps with some irrelevant information",
+        "5": "Working backwards from a final result through several changes"
+      }
+    },
+    {
+      "id": "number.place_value",
+      "name": "Number system and place value",
+      "topic": "number",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [],
+      "levels": {
+        "1": "Read, write or compare large whole numbers",
+        "3": "Round, order or build numbers from place-value clues",
+        "5": "Find a number meeting several place-value and rounding conditions"
+      }
+    },
+    {
+      "id": "number.factors_multiples",
+      "name": "Factors and multiples",
+      "topic": "number",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "List the factors or first multiples of a number",
+        "3": "Find a common factor or common multiple of two numbers",
+        "5": "Use LCM or GCF in a context such as repeating events or equal grouping"
+      }
+    },
+    {
+      "id": "measure.time",
+      "name": "Operations with time",
+      "topic": "measure",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Convert between hours, minutes and seconds",
+        "3": "Add or subtract times across the hour or across noon",
+        "5": "Multi-step schedule problem mixing units and durations"
+      }
+    },
+    {
+      "id": "measure.length",
+      "name": "Operations with length",
+      "topic": "measure",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.decimals"
+      ],
+      "levels": {
+        "1": "Convert between two metric length units",
+        "3": "Add or subtract lengths given in mixed units",
+        "5": "Multi-step problem with cutting, joining or scaling lengths"
+      }
+    },
+    {
+      "id": "measure.weight",
+      "name": "Operations with weight",
+      "topic": "measure",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.decimals"
+      ],
+      "levels": {
+        "1": "Convert between grams and kilograms",
+        "3": "Add, subtract or share weights in mixed units",
+        "5": "Find one item's weight from combined weighings"
+      }
+    },
+    {
+      "id": "measure.capacity",
+      "name": "Operations with liquid volume",
+      "topic": "measure",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.decimals"
+      ],
+      "levels": {
+        "1": "Convert between millilitres and litres",
+        "3": "Add, subtract or share amounts in mixed units",
+        "5": "Pouring or filling problem across several containers"
+      }
+    },
+    {
+      "id": "data.tables_graphs",
+      "name": "Data handling",
+      "topic": "data",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.whole_ops"
+      ],
+      "levels": {
+        "1": "Read one value from a table, bar graph or pictograph",
+        "3": "Compare or combine values across categories",
+        "5": "Answer a multi-step question from a graph with a scale or missing entry"
+      }
+    },
+    {
+      "id": "data.averages",
+      "name": "Averages",
+      "topic": "data",
+      "contests": [
+        "imc"
+      ],
+      "prerequisites": [
+        "number.fractions"
+      ],
+      "levels": {
+        "1": "Find the mean of a short list of numbers",
+        "3": "Find a missing value given the mean",
+        "5": "See how the mean changes when a value is added or removed"
+      }
+    }
+  ]
+}
