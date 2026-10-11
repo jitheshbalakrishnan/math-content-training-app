@@ -4,7 +4,7 @@ This is a single-page practice app for a grade 5-6 student preparing for math co
 
 When reviewing a pull request, check these first:
 
-1. **Built page is current.** If `app.src.html` or `skill_map.json` changed, `math-contest-trainer.html` must change too and match `python3 build.py`. Flag hand edits to the built page.
+1. **Built page is current.** If anything under `src/` or `skill_map.json` changed, `math-contest-trainer.html` must change too and match `python3 build.py`. Flag hand edits to the built page.
 2. **Answer check is honest.** Every problem shown must come from `makeProblem`. The second solve runs only when `verify` is on (off by default, the owner's decision). Flag any copy or tutor rule that calls an answer checked or verified when `checked` is false, and any change that weakens the check when it is on.
 3. **No copied contest material.** Flag text that looks like a published contest problem, including in prompts, examples and `skill_map.json`.
 4. **Figures stay data-driven.** Figures must pass `validFigure` and be drawn by `figureEl`. Flag any rendering of model-written SVG or HTML, and any new figure type without validation and a `figText` branch.

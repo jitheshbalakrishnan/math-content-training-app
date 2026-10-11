@@ -4,14 +4,15 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 
 ## Files
 
-- `app.src.html`: the whole app (HTML, CSS, JavaScript). Contains the placeholder `__SKILLMAP__`.
-- `skill_map.json`: contests, topics, skills, level anchors, the Kangaroo style guide, and which figure types each skill may use.
-- `build.py`: embeds the skill map into the source to produce the built page.
+- `src/index.html`: the page shell, with a slot for styles and a slot for scripts.
+- `src/css/*.css` and `src/js/*.js`: the styles and scripts, pasted in by file-name order. The numbers at the start of each name set the order. The scripts share one scope and have no imports, so a file may use anything defined in an earlier file. The README lists what each script holds.
+- `skill_map.json`: contests, topics, skills, level anchors, style guides, paper layouts, and which figure types each skill may use. `src/js/01-setup.js` contains the placeholder `__SKILLMAP__`.
+- `build.py`: assembles the built page.
 - `math-contest-trainer.html`: the built page that gets published. Generated, never edited by hand.
 
 ## Build and publish
 
-1. Edit `app.src.html` or `skill_map.json`.
+1. Edit files under `src/` or `skill_map.json`.
 2. Run `python3 build.py`, then `python3 build.py --check`.
 3. Commit the source and the built page together.
 4. The live page is a Claude artifact published from `math-contest-trainer.html` with the `sample`, `db` and `user` capabilities. Republish to the same artifact so the link and saved progress are kept.
@@ -30,6 +31,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 
 ## Data
 
+- Documents read from the database are frozen. Clone them before using them as working state (`loadState`, `loadMock`), or changes are silently ignored.
 - Learner state is one document at `data/users/<id>/state`, mirrored to `localStorage` as a fallback. It includes topics a parent added (`custom`).
 - Each answered problem is appended to `data/users/<id>/log/attempts`. Nothing reads this log yet.
 - Tutor chats are not saved.
