@@ -1,11 +1,11 @@
 {
-  "version": "0.4-draft",
+  "version": "0.5-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
     "kangaroo": {
       "name": "Math Kangaroo, Levels 5-6 (Benjamin)",
-      "format_note": "Recent grades 5-6 papers have 30 multiple-choice questions with five options: questions 1-10 are worth 3 points, 11-20 are worth 4 and 21-30 are worth 5. Time limit still to confirm against the official rules.",
+      "format_note": "Grades 5-6 papers have 30 multiple-choice questions with five options and a 75-minute limit: questions 1-10 are worth 3 points, 11-20 are worth 4 and 21-30 are worth 5, for a maximum of 120. Wrong answers do not lose points. (Math Kangaroo USA scoring and FAQ pages.)",
       "style": {
         "source_note": "Written in our own words after studying published Math Kangaroo grades 5-6 papers. No contest problem is copied here; the examples below are original.",
         "rules": [
