@@ -440,14 +440,22 @@ function cleanProblem(p, sk) {
   }
   return { question: p.question.trim(), figure, choice_figures, choices, answer: p.answer, hints, solution: p.solution.trim() };
 }
+const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after this long
+const stage = new Map();             // what each problem in the works is doing, for the waiting screen
+function ask(prompt) {
+  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CALL_LIMIT_MS);
+  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => clearTimeout(timer));
+}
 async function makeProblem(skillId, level) {
-  const sk = SK[skillId], st = skillState(skillId);
+  const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level;
   for (let draft = 0; draft < 2; draft++) {            // at most two drafts, then give up and say so
     let p, v;
-    try { p = cleanProblem(await env.sample.json(genPrompt(sk, level, st), { cache: false }), sk); }
+    stage.set(key, draft ? 'redo' : 'write');
+    try { p = cleanProblem(await ask(genPrompt(sk, level, st)), sk); }
     catch (e) { if (e && e.code === 'invalid_json') continue; throw e; }
     if (!p) continue;
-    try { v = await env.sample.json(verifyPrompt(p), { cache: false }); }
+    stage.set(key, draft ? 'recheck' : 'check');
+    try { v = await ask(verifyPrompt(p)); }
     catch (e) { if (e && e.code === 'invalid_json') continue; throw e; }
     const letter = String((v && v.answer) || '').trim().toUpperCase();
     if (letter.length === 1 && LETTERS.indexOf(letter) === p.answer) return p;
@@ -465,6 +473,7 @@ function errCopy(e) {
   const c = e && e.code;
   if (c === 'not_granted') return "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu, then try again.";
   if (c === 'rate_limited') return 'Too many requests right now. Wait a minute, then try again.';
+  if (c === 'cancelled') return 'That problem took too long to write, so it was stopped. Try again.';
   if (c === 'unverified') return "Two problems failed the answer check, so neither was shown. Try again for a new one.";
   return "Couldn't write a problem this time. Try again.";
 }
@@ -482,20 +491,38 @@ function nextTarget() {
 }
 async function loadProblem() {
   const t = nextTarget();
-  cur = { target: t, loading: true };
+  cur = { target: t, loading: true, since: Date.now() };
   render();
   try {
-    const p = await takeProblem(t.skill, t.level);
+    const wanted = takeProblem(t.skill, t.level);
+    // Start the following problem now, so it is being written while this one is written and solved.
+    if (!S.placement.done) { const nx = S.placement.queue[S.placement.i + 1]; if (nx && SK[nx]) fetchProblem(nx, 3); }
+    else { S.planned = pickNext(t.skill); fetchProblem(S.planned, skillState(S.planned).level); }
+    const p = await wanted;
     if (!cur || cur.target !== t) return;
     cur = { target: t, p, picked: null, checked: false, hints: 0, t0: Date.now(), chat: [], chatOpen: false, reason: null, note: '' };
-    if (!S.placement.done) { const nx = S.placement.queue[S.placement.i + 1]; if (nx) fetchProblem(nx, 3); }
-    else { S.planned = pickNext(t.skill); fetchProblem(S.planned, skillState(S.planned).level); }
   } catch (e) {
     if (!cur || cur.target !== t) return;
     cur = { target: t, error: errCopy(e) };
   }
-  render();
+  try { render(); }
+  catch (e) {                          // a problem that cannot be drawn must not leave the waiting screen up forever
+    console.error(e);
+    cur = { target: t, error: 'That problem could not be shown, so it was dropped. Try again for a new one.' };
+    render();
+  }
 }
+const STAGE_TEXT = { write: 'Writing a problem', check: 'Checking its answer', redo: 'The first draft failed the check. Writing another', recheck: 'Checking the second draft' };
+function waitText() {
+  const secs = Math.round((Date.now() - cur.since) / 1000);
+  return (STAGE_TEXT[stage.get(cur.target.skill + '@' + cur.target.level)] || STAGE_TEXT.write) + ' (' + secs + ' s)';
+}
+setInterval(() => {                    // keep the waiting screen honest about how long it has been
+  if (!cur || !cur.loading) return;
+  const line = $('wait-line'), again = $('wait-again');
+  if (line) line.textContent = waitText();
+  if (again) again.hidden = Date.now() - cur.since < 45000;
+}, 1000);
 function settle() {                  // (re)apply this problem's outcome from the snapshot taken before it
   const c = cur, id = c.target.skill;
   const st = applyResult(clone(c.before), { correct: c.correct, guessed: c.reason === 'guess', hints: c.hints, reason: c.reason });
@@ -633,7 +660,11 @@ function viewPractice() {
     h('span', null, t.mode === 'placement' ? 'Placement ' + (S.placement.i + 1) + ' of ' + S.placement.queue.length
       : 'Level ' + t.level + (sk.contests.includes('kangaroo') ? ', about a ' + (t.level <= 2 ? 3 : t.level <= 4 ? 4 : 5) + '-point Kangaroo question' : '')),
     t.mode === 'retry' ? h('span', null, 'A similar one to try again') : null);
-  if (cur.loading) return [h('div', { class: 'sheet' }, meta, busyLine('Writing a problem, then checking its answer'), h('p', { class: 'muted small' }, 'This can take up to a minute.'))];
+  if (cur.loading) return [h('div', { class: 'sheet' }, meta,
+    h('p', null, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), h('span', { id: 'wait-line' }, waitText())),
+    h('p', { class: 'muted small' }, 'Each problem is written, then solved a second time to check the answer. That usually takes under a minute, and longer for problems with figures.'),
+    h('div', { class: 'row', id: 'wait-again', hidden: Date.now() - cur.since < 45000 },
+      h('span', null, 'Taking a while?'), h('button', { class: 'btn quiet', type: 'button', onclick: loadProblem }, 'Start this one again')))];
   if (cur.error) return [h('div', { class: 'sheet' }, meta, h('p', null, cur.error), h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Try again')))];
 
   const c = cur, p = c.p, st = skillState(t.skill);
