@@ -474,20 +474,22 @@ function cleanProblem(p, sk) {
 }
 const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after this long
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
-function ask(prompt) {
-  const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), CALL_LIMIT_MS);
-  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => clearTimeout(timer));
+function ask(prompt, outer) {         // one Claude call, stopped by its time limit or by the caller's signal
+  const ctl = new AbortController(), stop = () => ctl.abort(), timer = setTimeout(stop, CALL_LIMIT_MS);
+  if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', stop); }
+  return env.sample.json(prompt, { cache: false, signal: ctl.signal }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
 }
-async function makeProblem(skillId, level) {
+async function makeProblem(skillId, level, signal) {
   const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [];
   for (let draft = 0; draft < 2; draft++) {            // at most two drafts, then give up and say so
     let p, v;
+    if (signal && signal.aborted) throw { code: 'cancelled' };
     stage.set(key, draft ? 'redo' : 'write');
-    try { p = cleanProblem(await ask(genPrompt(sk, level, st)), sk); }
+    try { p = cleanProblem(await ask(genPrompt(sk, level, st), signal), sk); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the draft could not be read as data'); continue; } throw e; }
     if (p.fault) { why.push(p.fault); continue; }
     stage.set(key, draft ? 'recheck' : 'check');
-    try { v = await ask(verifyPrompt(p)); }
+    try { v = await ask(verifyPrompt(p), signal); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
     const said = String((v && v.answer) == null ? '' : v.answer).trim();
     const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
@@ -496,13 +498,28 @@ async function makeProblem(skillId, level) {
   }
   throw { code: 'unverified', why };
 }
-const pre = new Map();
+const pre = new Map();               // problems being written ahead of need: key -> { promise, ctl }
+let live = null;                     // the controller for the problem the student is waiting on
 function fetchProblem(skillId, level) {
   const k = skillId + '@' + level;
-  if (!pre.has(k)) { const pr = makeProblem(skillId, level); pr.catch(() => {}); pre.set(k, pr); }
+  if (!pre.has(k)) {
+    const ctl = new AbortController(), promise = makeProblem(skillId, level, ctl.signal);
+    promise.catch(() => {});
+    pre.set(k, { promise, ctl });
+  }
   return pre.get(k);
 }
-function takeProblem(skillId, level) { const pr = fetchProblem(skillId, level); pre.delete(skillId + '@' + level); return pr; }
+function takeProblem(skillId, level) {
+  if (live) live.abort();            // stop a problem he was waiting on and no longer wants (no effect once it has finished)
+  const entry = fetchProblem(skillId, level);
+  pre.delete(skillId + '@' + level);
+  live = entry.ctl;
+  return entry.promise;
+}
+function dropPrepared() {            // stop and forget every problem prepared ahead, so no unwanted calls keep running
+  for (const entry of pre.values()) entry.ctl.abort();
+  pre.clear();
+}
 function errCopy(e) {
   const c = e && e.code;
   if (c === 'not_granted') return "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu, then try again.";
@@ -641,15 +658,19 @@ async function tutorSend(text, hidden) {
   const reply = { role: 'assistant', content: '', pending: true };
   const turns = [{ role: 'user', content: tutorRules(c) }].concat(c.chat.filter(m => m.content && !m.error).slice(-16).map(m => ({ role: m.role, content: m.content })));
   c.chat.push(reply); c.busy = true; c.ctl = new AbortController();
+  let late = false;
+  const timer = setTimeout(() => { late = true; c.ctl.abort(); }, CALL_LIMIT_MS);   // same limit as problem writing
   renderChat();
   try {
     const r = await env.sample(turns, { cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } });
     reply.content = r.text;
   } catch (e) {
     reply.content = (e && e.text) || '';
-    if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
+    if (late) reply.error = 'The tutor took too long to answer, so it was stopped. Ask again.';
+    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
     if (!reply.content && !reply.error) c.chat.splice(c.chat.indexOf(reply), 1);
   }
+  clearTimeout(timer);
   reply.pending = false; c.busy = false;
   if (cur === c) renderChat();
 }
@@ -687,7 +708,7 @@ function busyLine(t) { return h('p', null, h('span', { class: 'dots' }, h('i'), 
 function chooseTopic(id) {
   S.focus = id && TOPIC[id] ? id : null;
   S.planned = null; S.retry = null;
-  pre.clear();                       // problems prepared for the old choice are no longer wanted
+  dropPrepared();                    // problems prepared for the old choice are no longer wanted
   saveState();
   if (cur && !(cur.p && cur.checked)) { if (cur.ctl) cur.ctl.abort(); loadProblem(); }   // swap an unanswered problem right away
   else render();                     // an answered one stays up; the choice applies from the next problem
@@ -801,7 +822,7 @@ function viewProgress() {
       return h('div', { class: 'prog-row' }, h('span', null, s.name), st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'), h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
   const reset = h('div', { class: 'row' }, confirmReset
-    ? [h('span', null, 'Erase all progress? Topics you added stay.'), h('button', { class: 'btn', type: 'button', onclick: () => { confirmReset = false; const kept = S.custom || []; S = newState(); S.custom = kept; syncCustom(); cur = null; pre.clear(); saveState(); location.hash = '#practice'; render(); } }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
+    ? [h('span', null, 'Erase all progress? Topics you added stay.'), h('button', { class: 'btn', type: 'button', onclick: () => { confirmReset = false; const kept = S.custom || []; S = newState(); S.custom = kept; syncCustom(); if (live) live.abort(); cur = null; dropPrepared(); saveState(); location.hash = '#practice'; render(); } }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
     : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
   return [head, ...groups, reset];
 }
