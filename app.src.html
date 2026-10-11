@@ -1,21 +1,15 @@
 <title>Math Contest Trainer</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@500;700;800&display=swap">
 <style>
+/* One light look in every viewer theme, by choice: the page is squared paper. */
 /* Layout: a squared-paper exercise book. One problem per sheet, a red margin rule down the left, a single left-aligned column. */
 :root{
   --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
   --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
+  color-scheme:light;
   --display:"Gabarito","Trebuchet MS",system-ui,sans-serif;
   --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
 }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --paper:#12241F; --grid:#1B332C; --sheet:#182E28; --ink:#EDF3EC; --muted:#A3B8AD;
-  --margin:#EE8176; --hl:#F2CE4A; --on-hl:#12241F; --good:#74D6A8; --good-bg:#1D4234; --bad:#F39C92; --bad-bg:#47251F; --line:#35524A; --shade:#5E7A70;
-  color-scheme:dark } }
-:root[data-theme="dark"]{
-  --paper:#12241F; --grid:#1B332C; --sheet:#182E28; --ink:#EDF3EC; --muted:#A3B8AD;
-  --margin:#EE8176; --hl:#F2CE4A; --on-hl:#12241F; --good:#74D6A8; --good-bg:#1D4234; --bad:#F39C92; --bad-bg:#47251F; --line:#35524A; --shade:#5E7A70;
-  color-scheme:dark }
 
 *{box-sizing:border-box}
 body{background-color:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
