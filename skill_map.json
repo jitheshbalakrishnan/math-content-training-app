@@ -1,5 +1,5 @@
 {
-  "version": "0.7-draft",
+  "version": "0.8-draft",
   "grade_band": "5-6",
   "level_scale": "1 = warm-up, 3 = typical contest question, 5 = hardest contest question",
   "contests": {
@@ -127,7 +127,7 @@
     "olympiad": {
       "name": "CREST Mathematics Olympiad (CMO), grade 6",
       "short": "CREST Math Olympiad",
-      "format_note": "From the CREST grade 6 sample paper: 50 multiple-choice questions with four options in 60 minutes. Practical Mathematics has 40 questions at 1 mark and the Achiever's Section has 10 at 2 marks, for 60 marks. The paper's own syllabus lists number, geometry, mensuration, algebra, ratio, symmetry and data topics only. Skills marked extra come from an earlier list the owner supplied and are not in that syllabus. Whether wrong answers lose marks is not confirmed.",
+      "format_note": "From the CREST grade 6 sample paper: 50 multiple-choice questions with four options in 60 minutes. Practical Mathematics has 40 questions at 1 mark and the Achiever's Section has 10 at 2 marks, for 60 marks. The skills combine two sources by the owner's decision: the CREST paper's own syllabus (number, geometry, mensuration, algebra, ratio, symmetry, data) and an olympiad syllabus the owner supplied earlier, which adds seven logical reasoning skills. Whether wrong answers lose marks is not confirmed.",
       "choices": 4,
       "paper": {
         "minutes": 60,
@@ -1018,8 +1018,7 @@
         "1": "Continue a letter series with a fixed skip",
         "3": "Find the missing term in a series mixing letters and numbers",
         "5": "Find the wrong term, or a series with two alternating rules"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.coding_decoding",
@@ -1033,8 +1032,7 @@
         "1": "Decode a word when each letter moves a fixed number of places",
         "3": "Work out the rule from one coded word and apply it to another",
         "5": "Codes that use number values of letters or a rule that changes by position"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.analogy_odd_one_out",
@@ -1048,8 +1046,7 @@
         "1": "Pick the odd one out from five numbers or words",
         "3": "Complete a number or word analogy",
         "5": "Find the odd one out where two rules look plausible and only one fits all the others"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.cubes_dice",
@@ -1065,8 +1062,7 @@
         "1": "Use opposite faces of a standard die adding to 7",
         "3": "Find the face opposite a given face from two views described in words",
         "5": "Count small cubes with 0, 1, 2 or 3 painted faces after a painted cube is cut"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.direction_sense",
@@ -1080,8 +1076,7 @@
         "1": "Follow two turns and say which way someone faces",
         "3": "Follow a walk with several legs and find the distance or direction from the start",
         "5": "Walks with turns given as left and right from a changing heading, or two walkers"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.blood_relations",
@@ -1095,8 +1090,7 @@
         "1": "Name the relationship from one statement",
         "3": "Chain two or three statements to find how two people are related",
         "5": "Coded relationships, or a family of six with several clues"
-      },
-      "extra": true
+      }
     },
     {
       "id": "logic.venn_diagrams",
@@ -1112,8 +1106,7 @@
         "1": "Read how many belong to one group from a two-group description",
         "3": "Find how many belong to both or neither of two groups",
         "5": "Three overlapping groups with several counts given"
-      },
-      "extra": true
+      }
     },
     {
       "id": "number.exponents",
