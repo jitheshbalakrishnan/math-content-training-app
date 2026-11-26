@@ -45,10 +45,10 @@ def test_import_runs_and_refuses_a_second_time(engine):
         pytest.skip("psql is not installed")
     from import_state import build  # tests/test_import.py put scripts/ on the path
 
-    sql = build(SERVER / "tests" / "fixtures" / "export", "Sam", 5, "Family")
+    sql = build(SERVER / "tests" / "fixtures" / "sample_export", "Sam", 5, "Family")
     libpq = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)
     run = lambda: subprocess.run(["psql", libpq, "-q"], input=sql, text=True, capture_output=True, check=True).stdout
     assert "Imported Sam" in run()
     assert "already in the database" in run()
     with engine.connect() as c:
-        assert c.exec_driver_sql("SELECT sum(points) FROM answers").scalar() == 5
+        assert c.exec_driver_sql("SELECT sum(points) FROM answers").scalar() == 9

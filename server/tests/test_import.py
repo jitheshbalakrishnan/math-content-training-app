@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from import_state import build, lit  # noqa: E402
 
-EXPORT = Path(__file__).parent / "fixtures" / "export"
+EXPORT = Path(__file__).parent / "fixtures" / "sample_export"
 
 
 def test_quotes_text_and_json():
@@ -20,14 +20,15 @@ def test_builds_one_transaction_with_a_guard():
     assert "'Sam'" in sql and "Kid''s favorite" in sql
 
 
-def test_same_question_is_one_problem():
+def test_problems_merge_only_when_everything_matches():
     sql = build(EXPORT, "Sam", 5, "Family")
-    assert sql.count("INSERT INTO problems") == 2
-    assert sql.count("INSERT INTO answers") == 3
+    # a2 and a3 are the same problem; a4 has the same question with other choices, so it is its own problem
+    assert sql.count("INSERT INTO problems") == 3
+    assert sql.count("INSERT INTO answers") == 4
 
 
 def test_points_follow_the_rule():
     sql = build(EXPORT, "Sam", 5, "Family")
     answers = [line for line in sql.splitlines() if line.startswith("INSERT INTO answers")]
-    # right first time at level 4 -> 4; wrong then fixed on retry -> 1; a right guess -> 0
-    assert [a.rsplit(", ", 2)[-2] for a in answers] == ["4", "1", "0"]
+    # right first time at level 4 -> 4; wrong then fixed on retry -> 1; a right guess -> 0; right -> 4
+    assert [a.rsplit(", ", 2)[-2] for a in answers] == ["4", "1", "0", "4"]

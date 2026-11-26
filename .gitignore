@@ -11,4 +11,5 @@ __pycache__/
 # learner data and copyrighted source papers stay on this machine
 *.pdf
 import.sql
-export/
+/export/
+math-trainer-export/

@@ -85,14 +85,17 @@ def build(export: Path, child: str, grade: int | None, family: str) -> str:
             "finished_at": lit(m.get("at")), "questions": lit(m.get("n")), "correct": lit(m.get("correct")),
             "score": lit(m.get("score")), "max_score": lit(m.get("max")), "seconds_used": lit(m.get("secs")),
         }))
-    seen: dict[str, str] = {}                   # question text -> psql variable holding its problem id
+    seen: dict[str, str] = {}                   # everything stored about a problem -> psql variable holding its id
     for i, a in enumerate(attempts):
         q = a.get("question")
         if not q or not isinstance(a.get("choices"), list):
             continue
-        var = seen.get(q)
+        # Same problem only when every stored field matches, so an answer is never linked to other choices or key.
+        key = json.dumps([a.get("skill"), a.get("level", 3), q, a["choices"], a.get("answer"), a.get("figure")],
+                         sort_keys=True, ensure_ascii=False)
+        var = seen.get(key)
         if var is None:
-            var = seen[q] = f"p{i}"
+            var = seen[key] = f"p{i}"
             out.append(insert("problems", {
                 "skill": lit(a["skill"]), "level": lit(a.get("level", 3)),
                 "contest": lit(contest if contest in ("kangaroo", "imc", "olympiad") else None),
