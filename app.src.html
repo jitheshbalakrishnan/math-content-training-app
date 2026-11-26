@@ -212,7 +212,7 @@ async function loadState() {
   if (env.db && env.base) {
     try {
       const snap = await env.db.collection(env.base).doc('state').get();
-      if (snap.exists) return snap.data();
+      if (snap.exists) return clone(snap.data());      // documents from the database are frozen; the app edits its state in place, so it needs its own copy
     } catch (e) { env.db = null; showNotice('Could not reach your saved progress. For now, progress is kept on this device only.'); }
   }
   try { const raw = localStorage.getItem(LS); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
@@ -1019,7 +1019,7 @@ function saveMock() {                // a test in progress survives a reload; th
 }
 async function loadMock() {
   let m = null;
-  if (env.db && env.base) { try { const snap = await env.db.collection(env.base).doc('mock').get(); if (snap.exists) m = snap.data(); } catch (e) {} }
+  if (env.db && env.base) { try { const snap = await env.db.collection(env.base).doc('mock').get(); if (snap.exists) m = clone(snap.data()); } catch (e) {} }     // a frozen document would silently refuse his answers
   if (!m) { try { const raw = localStorage.getItem(LS_MOCK); m = raw ? JSON.parse(raw) : null; } catch (e) {} }
   const ok = m && m.v === 1 && (m.phase === 'run' || m.phase === 'done') && Array.isArray(m.items) && m.items.length && Array.isArray(m.answers)
     && m.items.every(it => it && it.p && Array.isArray(it.p.choices) && typeof it.p.question === 'string');
