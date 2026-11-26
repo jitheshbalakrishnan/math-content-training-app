@@ -54,8 +54,9 @@ def build(export: Path, child: str, grade: int | None, family: str) -> str:
     for label, name in (("child", child), ("family", family)):
         if not NAME.fullmatch(name):
             raise ImportError_(f"The {label} name {name!r} can only use letters, spaces, apostrophes, dots and hyphens.")
-    mock = export / "mock.json"
-    if mock.exists() and json.loads(mock.read_text(encoding="utf-8") or "null"):
+    mock = export / "mock.json"     # a finished test stays saved (phase "done") and is already in state and attempts
+    saved = json.loads(mock.read_text(encoding="utf-8") or "null") if mock.exists() else None
+    if saved and saved.get("phase") != "done":
         raise ImportError_("This export has a mock test that was not finished (mock.json). Finish or cancel it in the "
                            "app, export again, then import. Nothing was imported.")
     state = json.loads((export / "state.json").read_text(encoding="utf-8"))
@@ -116,8 +117,9 @@ def build(export: Path, child: str, grade: int | None, family: str) -> str:
         if not q or not isinstance(a.get("choices"), list):
             continue
         # Same problem only when every stored field matches, so an answer is never linked to other choices or key.
-        key = json.dumps([a.get("skill"), a.get("level", 3), q, a["choices"], a.get("answer"), a.get("figure")],
-                         sort_keys=True, ensure_ascii=False)
+        # Each mock test question stays its own problem: a test may repeat a question, and each slot gets one answer.
+        key = json.dumps([a.get("skill"), a.get("level", 3), q, a["choices"], a.get("answer"), a.get("figure"),
+                          i if a.get("mode") == "mock" else None], sort_keys=True, ensure_ascii=False)
         var = seen.get(key)
         if var is None:
             var = seen[key] = f"p{i}"

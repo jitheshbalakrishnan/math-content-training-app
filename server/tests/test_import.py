@@ -98,3 +98,20 @@ def test_old_results_and_problems_do_not_guess_a_contest():
     mock = [line for line in sql.splitlines() if line.startswith("INSERT INTO mock_tests")][0]
     assert "'kangaroo'" not in mock and "NULL" in mock
     assert all('"contest"' not in line for line in sql.splitlines() if line.startswith("INSERT INTO problems"))
+
+
+def test_a_finished_mock_test_does_not_stop_the_import(tmp_path):
+    export = copy_export(tmp_path)
+    (export / "mock.json").write_text(json.dumps({"v": 1, "phase": "done", "items": []}))
+    assert "COMMIT;" in build(export, "Sam", 5, "Family")
+
+
+def test_a_repeated_question_in_one_mock_test_stays_two_problems(tmp_path):
+    export = copy_export(tmp_path)
+    slot = {"at": "2026-10-01T15:00:00Z", "skill": "number.fractions", "level": 3, "mode": "mock",
+            "question": "What is 1/3 of 12?", "figure": None, "choices": ["2", "3", "4", "6", "9"],
+            "answer": 2, "picked": 2, "correct": True, "ms": None, "hints": 0, "reason": None, "note": ""}
+    for n in ("m1", "m2"):
+        (export / f"log/attempts/{n}.json").write_text(json.dumps(slot))
+    sql = build(export, "Sam", 5, "Family")
+    assert sql.count("'What is 1/3 of 12?'") == 2
