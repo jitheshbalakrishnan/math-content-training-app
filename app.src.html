@@ -21,7 +21,7 @@ h1{font-family:var(--display);font-weight:800;font-size:1.9rem;line-height:1.1;m
 h2{font-family:var(--display);font-weight:700;font-size:1.35rem;line-height:1.2;margin:0;text-wrap:balance}
 h3{font-family:var(--display);font-weight:700;font-size:1.05rem;margin:0}
 p{margin:0}
-nav{display:flex;gap:4px}
+nav{display:flex;flex-wrap:wrap;gap:4px}
 nav a{font-family:var(--display);font-weight:700;color:var(--ink);text-decoration:none;padding:6px 12px;border-bottom:3px solid transparent}
 nav a[aria-current="page"]{border-bottom-color:var(--margin)}
 :focus-visible{outline:3px solid var(--margin);outline-offset:2px}
@@ -70,6 +70,21 @@ input[type=text]{font:inherit;color:var(--ink);background:var(--sheet);border:0;
 .figure table{border-collapse:collapse;font-variant-numeric:tabular-nums}
 .figure th,.figure td{border:1px solid var(--ink);padding:6px 12px;text-align:left}
 .figure th{font-family:var(--display)}
+.mockbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:2;display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:2px 16px;background:var(--hl);color:var(--on-hl);padding:8px 14px;font-family:var(--display);font-weight:700}
+.clock{font-size:1.5rem;font-variant-numeric:tabular-nums}
+.clock.low{color:var(--bad)}
+.qnav{display:flex;flex-wrap:wrap;gap:6px}
+.qnav button{width:40px;height:40px;border:2px solid var(--ink);background:var(--sheet);font-family:var(--display);font-weight:700;padding:0}
+.qnav button.done{background:var(--ink);color:var(--sheet)}
+.qnav button[aria-current="true"]{outline:3px solid var(--margin);outline-offset:2px}
+.slots{display:flex;flex-wrap:wrap;gap:4px}
+.slots i{width:14px;height:14px;border:1.5px solid var(--ink);display:block}
+.slots i.ok{background:var(--ink)}
+.slots i.fail{background:var(--bad-bg);border-color:var(--bad)}
+.rev{border-bottom:1px solid var(--line);padding:10px 0}
+.rev summary{cursor:pointer;font-family:var(--display);font-weight:700}
+.rev>div{display:flex;flex-direction:column;gap:12px;padding-top:10px}
+.tally{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;font-variant-numeric:tabular-nums}
 .pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
 .pick select{width:auto;flex:1 1 14rem;max-width:24rem;min-height:46px}
 .field{display:flex;flex-direction:column;gap:4px}
@@ -106,6 +121,7 @@ legend{padding:0;margin-bottom:4px}
     <h1>Math Contest Trainer</h1>
     <nav aria-label="Sections">
       <a href="#practice" id="tab-practice">Practice</a>
+      <a href="#mock" id="tab-mock">Mock test</a>
       <a href="#progress" id="tab-progress">Progress</a>
       <a href="#parents" id="tab-parents">Parents</a>
     </nav>
@@ -157,7 +173,7 @@ let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
 const env = { ready: false, sample: null, db: null, base: null };
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [] }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -806,6 +822,11 @@ function viewPracticeBody() {
 
 let confirmReset = false;
 function viewProgress() {
+  const out = viewProgressBody();
+  if (env.ready && S.mocks && S.mocks.length) out.splice(out.length > 1 ? out.length - 1 : 1, 0, mockHistory());   // above the Start over row
+  return out;
+}
+function viewProgressBody() {
   if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading your progress'))];
   const list = S.contest ? contestSkills() : [];
   const all = list.map(s => S.skills[s.id]).filter(Boolean);
@@ -828,6 +849,185 @@ function viewProgress() {
     ? [h('span', null, 'Erase all progress? Topics you added stay.'), h('button', { class: 'btn', type: 'button', onclick: () => { confirmReset = false; const kept = S.custom || []; S = newState(); S.custom = kept; syncCustom(); if (live) live.abort(); cur = null; dropPrepared(); saveState(); location.hash = '#practice'; render(); } }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
     : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
   return [head, ...groups, reset];
+}
+
+/* ---------- mock tests: a timed paper in the Math Kangaroo format, with no hints, tutor or feedback until the end ---------- */
+const MOCK_SIZES = {                 // the full size matches the real grades 5-6 paper: 30 questions, 75 minutes
+  short: { name: 'Short test', each: 4, minutes: 30 },
+  full: { name: 'Full test', each: 10, minutes: 75 },
+};
+const LS_MOCK = 'mct-mock-v1';
+let mock = null;                     // null, or { phase: 'prep' | 'run' | 'done', size, items, ... }
+let mockChain = Promise.resolve();
+let confirmFinish = false;
+
+function saveMock() {                // a test in progress survives a reload; the clock keeps running, as in a real test
+  const keep = mock && mock.phase !== 'prep' ? clone({ v: 1, phase: mock.phase, size: mock.size, answers: mock.answers, at: mock.at, started: mock.started, endsAt: mock.endsAt, usedSecs: mock.usedSecs || 0,
+    items: mock.items.map(it => ({ skill: it.skill, level: it.level, points: it.points, p: it.p })) }) : null;
+  try { if (keep) localStorage.setItem(LS_MOCK, JSON.stringify(keep)); else localStorage.removeItem(LS_MOCK); } catch (e) {}
+  if (env.db && env.base) {
+    const doc = env.db.collection(env.base).doc('mock');
+    mockChain = mockChain.then(() => keep ? doc.set(keep) : doc.delete()).catch(() => {});
+  }
+}
+async function loadMock() {
+  let m = null;
+  if (env.db && env.base) { try { const snap = await env.db.collection(env.base).doc('mock').get(); if (snap.exists) m = snap.data(); } catch (e) {} }
+  if (!m) { try { const raw = localStorage.getItem(LS_MOCK); m = raw ? JSON.parse(raw) : null; } catch (e) {} }
+  const ok = m && m.v === 1 && (m.phase === 'run' || m.phase === 'done') && Array.isArray(m.items) && m.items.length && Array.isArray(m.answers)
+    && m.items.every(it => it && it.p && Array.isArray(it.p.choices) && typeof it.p.question === 'string');
+  return ok ? m : null;
+}
+function shuffled(list) { const a = list.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function mockPlan(size) {            // one third of the questions at each point value, spread across the contest's skills
+  const each = MOCK_SIZES[size].each, skills = shuffled(contestSkills()), plan = [];
+  let k = 0;
+  for (const points of [3, 4, 5]) for (let i = 0; i < each; i++) {
+    const level = points === 3 ? 2 : points === 5 ? 5 : (i < each / 2 ? 3 : 4);
+    plan.push({ skill: skills[k++ % skills.length].id, level, points, status: 'wait', p: null });
+  }
+  return plan;
+}
+function prepareMock(size) {
+  mock = { phase: 'prep', size, items: mockPlan(size), ctl: new AbortController() };
+  writeMockItems();
+}
+async function writeMockItems() {    // write every question still missing, two at a time, each one tried once per press
+  const m = mock, todo = m.items.filter(it => it.status !== 'ok');
+  for (const it of todo) it.status = 'wait';
+  m.busy = true; m.stop = '';
+  render();
+  const worker = async () => {
+    for (let it = todo.shift(); it && !m.ctl.signal.aborted; it = todo.shift()) {
+      try { it.p = await makeProblem(it.skill, it.level, m.ctl.signal); it.status = 'ok'; }
+      catch (e) {
+        it.status = 'fail';
+        if (e && (e.code === 'not_granted' || e.code === 'rate_limited')) { m.stop = errCopy(e); todo.forEach(x => { x.status = 'fail'; }); todo.length = 0; }
+      }
+      if (mock === m && m.phase === 'prep') render();
+    }
+  };
+  await Promise.all([worker(), worker()]);
+  m.busy = false;
+  if (mock === m && m.phase === 'prep') render();
+}
+function cancelMock() { if (mock && mock.ctl) mock.ctl.abort(); mock = null; confirmFinish = false; saveMock(); render(); }
+function startMock() {
+  const m = mock, size = MOCK_SIZES[m.size];
+  m.items = m.items.filter(it => it.status === 'ok');
+  const minutes = Math.max(5, Math.round(size.minutes * m.items.length / (size.each * 3)));    // fewer questions, less time
+  m.phase = 'run'; m.answers = m.items.map(() => null); m.at = 0;
+  m.started = Date.now(); m.endsAt = m.started + minutes * 60000;
+  saveMock(); render();
+}
+function mockScore(m) {
+  const r = { correct: 0, score: 0, max: 0, blank: 0, tier: {}, topic: {} };
+  m.items.forEach((it, i) => {
+    const ok = m.answers[i] === it.p.answer, name = SK[it.skill] ? TOPIC[SK[it.skill].topic] : 'Other';
+    const t = r.tier[it.points] || (r.tier[it.points] = { ok: 0, n: 0 }), g = r.topic[name] || (r.topic[name] = { ok: 0, n: 0 });
+    t.n++; g.n++; r.max += it.points;
+    if (m.answers[i] == null) r.blank++;
+    if (ok) { t.ok++; g.ok++; r.correct++; r.score += it.points; }
+  });
+  return r;
+}
+function finishMock() {
+  const m = mock;
+  if (!m || m.phase !== 'run') return;
+  m.phase = 'done'; confirmFinish = false;
+  m.usedSecs = Math.round((Math.min(Date.now(), m.endsAt) - m.started) / 1000);
+  const r = mockScore(m), at = new Date().toISOString();
+  S.mocks = (S.mocks || []).concat({ at, size: m.size, n: m.items.length, correct: r.correct, score: r.score, max: r.max, secs: m.usedSecs }).slice(-20);
+  saveState(); saveMock();          // skill levels are left alone: a test measures, practice teaches
+  m.items.forEach((it, i) => logAttempt({ at, skill: it.skill, level: it.level, mode: 'mock', question: it.p.question, figure: it.p.figure || null, choices: it.p.choices, answer: it.p.answer, picked: m.answers[i], correct: m.answers[i] === it.p.answer, ms: null, hints: 0, reason: null, note: '' }));
+  render();
+}
+const clockText = ms => { const sec = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+setInterval(() => {                  // the test clock; time is taken from the end time, so a reload cannot add minutes
+  if (!mock || mock.phase !== 'run') return;
+  const left = mock.endsAt - Date.now();
+  if (left <= 0) { finishMock(); return; }
+  const el = $('mock-clock');
+  if (el) { el.textContent = clockText(left); el.classList.toggle('low', left < 5 * 60000); }
+}, 1000);
+
+function mockChoices(it, picked, review, onPick) {
+  const p = it.p;
+  return h('div', { role: 'group', 'aria-label': 'Answer choices' }, p.choices.map((txt, i) => {
+    const right = review && i === p.answer, wrong = review && picked === i && i !== p.answer;
+    return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : ''), type: 'button', disabled: review, 'aria-pressed': !review && picked === i ? 'true' : 'false', onclick: () => onPick && onPick(i) },
+      h('b', null, LETTERS[i]), h('span', null, p.choice_figures ? figureEl(p.choice_figures[i], true) : txt),
+      right ? h('em', null, picked === i ? 'Your answer, correct' : 'Correct answer') : wrong ? h('em', null, 'Your answer') : null);
+  }));
+}
+function viewMock() {
+  if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading'))];
+  if (!mock) {
+    if (!S.contest) return [h('div', { class: 'sheet' }, h('h2', null, 'Pick a contest first'), h('p', { class: 'muted' }, 'Choose what you are training for on the Practice tab, then come back for a test.'), h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#practice', style: 'text-decoration:none;display:inline-flex;align-items:center' }, 'Go to practice')))];
+    if (!env.sample) return [h('div', { class: 'sheet' }, h('h2', null, 'Open this page in Claude to take a test'), h('p', { class: 'muted' }, 'Test questions are written by Claude, which is not available in this view.'))];
+    return [h('div', { class: 'sheet' },
+      h('h2', null, 'Timed mock test'),
+      h('p', null, 'Set up like the real Math Kangaroo paper: questions worth 3, 4 and 5 points, a countdown clock, and no hints or tutor until you finish. Wrong answers do not lose points, so answer every question.'),
+      S.contest === 'imc' ? h('p', { class: 'muted' }, 'This uses the Math Kangaroo layout with your IMC topics, because the IMC paper format has not been set up yet.') : null,
+      h('div', { class: 'row' }, Object.keys(MOCK_SIZES).map(k => h('button', { class: 'btn', type: 'button', onclick: () => prepareMock(k) }, MOCK_SIZES[k].name + ': ' + MOCK_SIZES[k].each * 3 + ' questions, ' + MOCK_SIZES[k].minutes + ' minutes'))),
+      h('p', { class: 'muted small' }, 'Every question is written before the clock starts. That takes a few minutes for a short test and a good deal longer for a full one. A full test also uses a lot of Claude usage.'))];
+  }
+  const m = mock, n = m.items.length;
+  if (m.phase === 'prep') {
+    const ready = m.items.filter(it => it.status === 'ok').length, failed = m.items.filter(it => it.status === 'fail').length;
+    return [h('div', { class: 'sheet' },
+      h('h2', null, m.busy ? 'Writing your test' : failed ? 'Some questions are missing' : 'Your test is ready'),
+      h('p', null, m.busy ? h('span', { class: 'dots' }, h('i'), h('i'), h('i')) : null, ready + ' of ' + n + ' questions ready'),
+      h('div', { class: 'slots', role: 'img', 'aria-label': ready + ' of ' + n + ' questions ready' }, m.items.map(it => h('i', { class: it.status === 'ok' ? 'ok' : it.status === 'fail' ? 'fail' : '' }))),
+      m.stop ? h('p', null, m.stop) : null,
+      !m.busy && failed ? h('p', { class: 'muted' }, failed + (failed === 1 ? ' question' : ' questions') + ' could not be written.') : null,
+      !m.busy && !failed ? h('p', { class: 'muted' }, 'The clock starts when you press Start. Have paper and a pencil ready.') : null,
+      h('div', { class: 'row' },
+        !m.busy && ready >= 3 ? h('button', { class: 'btn primary', type: 'button', onclick: startMock }, failed ? 'Start with ' + ready + ' questions' : 'Start the test') : null,
+        !m.busy && failed ? h('button', { class: 'btn', type: 'button', onclick: writeMockItems }, 'Write the missing ones') : null,
+        h('button', { class: 'btn quiet', type: 'button', onclick: cancelMock }, 'Cancel')))];
+  }
+  if (m.phase === 'run') {
+    const it = m.items[m.at], left = m.endsAt - Date.now(), answered = m.answers.filter(a => a != null).length;
+    const go = i => { m.at = Math.max(0, Math.min(n - 1, i)); confirmFinish = false; saveMock(); render(); };
+    return [
+      h('div', { class: 'mockbar' }, h('span', { class: 'clock' + (left < 5 * 60000 ? ' low' : ''), id: 'mock-clock', role: 'timer', 'aria-label': 'Time left' }, clockText(left)),
+        h('span', null, 'Question ' + (m.at + 1) + ' of ' + n + ', ' + it.points + ' points')),
+      h('div', { class: 'sheet' },
+        h('p', { class: 'question' }, it.p.question),
+        it.p.figure ? figureEl(it.p.figure) : null,
+        mockChoices(it, m.answers[m.at], false, i => { m.answers[m.at] = m.answers[m.at] === i ? null : i; saveMock(); render(); }),
+        h('div', { class: 'row' },
+          h('button', { class: 'btn quiet', type: 'button', disabled: m.at === 0, onclick: () => go(m.at - 1) }, 'Back'),
+          h('button', { class: 'btn primary', type: 'button', disabled: m.at === n - 1, onclick: () => go(m.at + 1) }, 'Next question')),
+        h('hr'),
+        h('div', { class: 'qnav', role: 'group', 'aria-label': 'Jump to a question' }, m.items.map((x, i) => h('button', { type: 'button', class: m.answers[i] != null ? 'done' : '', 'aria-current': i === m.at ? 'true' : 'false', 'aria-label': 'Question ' + (i + 1) + (m.answers[i] != null ? ', answered' : ', not answered'), onclick: () => go(i) }, i + 1))),
+        h('div', { class: 'row' }, confirmFinish
+          ? [h('span', null, 'Finish now? You answered ' + answered + ' of ' + n + '.'), h('button', { class: 'btn', type: 'button', onclick: finishMock }, 'Finish the test'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmFinish = false; render(); } }, 'Keep going')]
+          : h('button', { class: 'btn', type: 'button', onclick: () => { confirmFinish = true; render(); } }, 'Finish the test')))];
+  }
+  const r = mockScore(m), unchecked = m.items.some(it => !it.p.checked);
+  return [h('div', { class: 'sheet' },
+      h('h2', null, r.score + ' of ' + r.max + ' points'),
+      h('p', null, r.correct + ' of ' + n + ' correct in ' + clockText((m.usedSecs || 0) * 1000) + (r.blank ? ', with ' + r.blank + ' left blank' : '') + '.'),
+      unchecked ? h('p', { class: 'muted small' }, 'The answer keys on this test were not double-checked, so now and then a key may be wrong. If an answer looks wrong, ask a grown-up.') : null,
+      h('div', { class: 'tally' }, [3, 4, 5].filter(k => r.tier[k]).flatMap(k => [h('span', null, k + '-point questions'), h('span', null, r.tier[k].ok + ' of ' + r.tier[k].n)])),
+      h('hr'),
+      h('div', { class: 'tally' }, Object.keys(r.topic).flatMap(k => [h('span', null, k), h('span', null, r.topic[k].ok + ' of ' + r.topic[k].n)])),
+      h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: cancelMock }, 'Take another test'))),
+    h('div', { class: 'sheet' }, h('h3', null, 'Go through your answers'),
+      h('div', null, m.items.map((it, i) => {
+        const a = m.answers[i], verdict = a == null ? 'left blank' : a === it.p.answer ? 'correct' : 'not correct';
+        return h('details', { class: 'rev' }, h('summary', null, 'Question ' + (i + 1) + ', ' + it.points + ' points, ' + verdict),
+          h('div', null, h('p', { class: 'question' }, it.p.question), it.p.figure ? figureEl(it.p.figure) : null, mockChoices(it, a, true), h('p', { class: 'solution' }, it.p.solution)));
+      })))];
+}
+function mockHistory() {
+  return h('div', { class: 'sheet' }, h('h3', null, 'Mock tests'),
+    h('div', null, S.mocks.slice().reverse().map(x => h('div', { class: 'prog-row' },
+      h('span', null, new Date(x.at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' + (MOCK_SIZES[x.size] ? MOCK_SIZES[x.size].name.toLowerCase() : 'test')),
+      h('span', null, x.score + ' of ' + x.max + ' points'),
+      h('span', { class: 'n' }, x.correct + ' of ' + x.n + ' right')))));
 }
 
 /* ---------- parents: add topics beyond the built-in skill map ---------- */
@@ -893,9 +1093,9 @@ function viewParents() {
 }
 
 function render() {
-  const route = location.hash === '#progress' ? 'progress' : location.hash === '#parents' ? 'parents' : 'practice';
-  for (const r of ['practice', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
-  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : viewPractice()));
+  const route = ['progress', 'parents', 'mock'].find(r => location.hash === '#' + r) || 'practice';
+  for (const r of ['practice', 'mock', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : route === 'mock' ? viewMock() : viewPractice()));
   if (route === 'practice' && cur && cur.p) { if (cur.chatOpen) renderChat(); if (cur.target.mode !== 'placement' && placedNote && cur.checked) placedNote = false; }
 }
 window.addEventListener('hashchange', render);
@@ -911,8 +1111,11 @@ async function boot() {
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);
   if (!Array.isArray(S.custom)) S.custom = [];
   syncCustom();
+  if (!Array.isArray(S.mocks)) S.mocks = [];
+  mock = await loadMock();
   env.ready = true;
-  render();
+  if (mock && mock.phase === 'run' && Date.now() >= mock.endsAt) finishMock();   // time ran out while the page was closed
+  else render();
 }
 boot();
 </script>
