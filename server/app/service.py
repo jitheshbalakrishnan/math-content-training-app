@@ -146,8 +146,18 @@ def create_problem(db: Session, body: schemas.ProblemIn) -> dict:
     return _problem_dict(p)
 
 
+def _in_running_test(db: Session, problem_id: int, child_id: int | None = None) -> bool:
+    q = (select(MockTest.id).join(MockTestItem, MockTestItem.mock_test_id == MockTest.id)
+         .where(MockTestItem.problem_id == problem_id, MockTest.status.in_(("preparing", "in_progress"))))
+    if child_id is not None:
+        q = q.where(MockTest.child_id == child_id)
+    return db.scalars(q.limit(1)).first() is not None
+
+
 def get_problem(db: Session, problem_id: int) -> dict:
-    return _problem_dict(_get(db, ProblemRow, problem_id, "problem"))
+    """A problem on a test that is being prepared or taken is shown without its key."""
+    pd = _problem_dict(_get(db, ProblemRow, problem_id, "problem"))
+    return _without_key(pd) if _in_running_test(db, problem_id) else pd
 
 
 def seen_problem_ids(db: Session, child_id: int, skill: str | None = None) -> list[int]:
@@ -179,6 +189,8 @@ def record_answer(db: Session, child_id: int, body: schemas.AnswerIn, now: datet
     problem = _get(db, ProblemRow, body.problem_id, "problem")
     if problem.status in ("rejected", "retired"):
         raise Problem(409, "That problem has been taken out of use.")
+    if _in_running_test(db, problem.id, child_id):
+        raise Problem(409, "That problem is on your mock test. Answer it there.")
     if body.practice_session_id is not None:
         s = _get(db, PracticeSession, body.practice_session_id, "practice set")
         if s.child_id != child_id:

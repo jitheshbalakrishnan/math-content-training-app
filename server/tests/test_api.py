@@ -227,3 +227,15 @@ def test_recent_answers_hide_a_running_test(api):
     assert [a["mode"] for a in api.get(f"/api/children/{cid}/answers").json()] == ["practice"]
     api.post(f"/api/children/{cid}/mocks/{m['id']}/finish")
     assert [a["mode"] for a in api.get(f"/api/children/{cid}/answers").json()] == ["mock", "practice"]
+
+
+def test_a_test_question_key_cannot_be_found_another_way(api):
+    cid = child(api)
+    m = make_mock(api, cid)
+    pid = m["items"][0]["problem"]["id"]
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/start")
+    assert "answer_index" not in api.get(f"/api/problems/{pid}").json()
+    r = api.post(f"/api/children/{cid}/answers", json={"problem_id": pid, "mode": "practice", "level": 3, "chosen_index": 0})
+    assert r.status_code == 409
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/finish")
+    assert api.get(f"/api/problems/{pid}").json()["answer_index"] == 0
