@@ -124,6 +124,11 @@ def edit_answer(child_id: int, answer_id: int, body: schemas.AnswerPatch, db: Se
     return run(lambda: service.update_answer(db, child_id, answer_id, body), db)
 
 
+@app.post("/api/children/{child_id}/answers/{answer_id}/retry")
+def retry(child_id: int, answer_id: int, body: schemas.RetryIn, db: Session = DB):
+    return run(lambda: service.retry_answer(db, child_id, answer_id, body), db)
+
+
 # ---------- practice sets ----------
 
 @app.post("/api/children/{child_id}/practice")

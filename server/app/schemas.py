@@ -1,9 +1,20 @@
 """What the page sends. Responses are plain dictionaries built in service.py."""
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, Field, model_validator
 
 Level = Field(ge=1, le=5)
+
+
+class Patch(BaseModel):
+    """A partial update: a field may be left out, but some may not be sent as null."""
+    NOT_NULL: ClassVar[tuple[str, ...]] = ()
+
+    @model_validator(mode="after")
+    def no_nulls(self):
+        if bad := [f for f in self.NOT_NULL if f in self.model_fields_set and getattr(self, f) is None]:
+            raise ValueError(f"{', '.join(bad)} cannot be null")
+        return self
 
 
 class ChildIn(BaseModel):
@@ -12,8 +23,9 @@ class ChildIn(BaseModel):
     family_id: int | None = None          # none: the first family
 
 
-class ChildPatch(BaseModel):
+class ChildPatch(Patch):
     """Only the fields sent are changed."""
+    NOT_NULL = ("first_name", "daily_goal", "weekly_goal", "placement", "settings")
     first_name: str | None = Field(default=None, min_length=1, max_length=40)
     grade: int | None = Field(default=None, ge=1, le=12)
     contest: str | None = None
@@ -46,17 +58,16 @@ class ProblemIn(BaseModel):
         if self.answer_kind == "choice":
             if not self.choices or self.answer_index is None or not 0 <= self.answer_index < len(self.choices):
                 raise ValueError("a multiple-choice problem needs choices and an answer_index that points at one")
-        elif not self.accepted_answers:
-            raise ValueError("a typed-answer problem needs at least one accepted answer")
+        elif not self.accepted_answers or any(not a.strip() for a in self.accepted_answers):
+            raise ValueError("a typed-answer problem needs accepted answers, none of them blank")
         return self
 
 
 class AnswerIn(BaseModel):
     """A practice, placement or retry answer. Mock test answers go to the mock test routes.
-    Whether it is right is worked out by the server from the problem's key."""
+    Whether it is right, its level and its points all come from the stored problem."""
     problem_id: int
     mode: Literal["placement", "practice", "retry"]
-    level: int = Level                    # the level it was asked at
     chosen_index: int | None = None
     typed_answer: str | None = None
     hints_used: int = Field(default=0, ge=0, le=10)
@@ -65,11 +76,15 @@ class AnswerIn(BaseModel):
 
 
 class AnswerPatch(BaseModel):
-    """What he adds after answering: why he missed it, a note, or how a retry went."""
+    """What he adds after answering: why he missed it, or a note. Null clears either."""
     trouble_reason: Literal["read", "start", "slip", "guess"] | None = None
     note: str | None = Field(default=None, max_length=500)
-    retries: int | None = Field(default=None, ge=0, le=10)
-    fixed_on_retry: bool | None = None
+
+
+class RetryIn(BaseModel):
+    """Another go at a missed problem. The server marks it."""
+    chosen_index: int | None = None
+    typed_answer: str | None = None
 
 
 class PracticeIn(BaseModel):
@@ -79,7 +94,8 @@ class PracticeIn(BaseModel):
     planned: list[str] = []
 
 
-class PracticePatch(BaseModel):
+class PracticePatch(Patch):
+    NOT_NULL = ("position", "planned", "status")
     position: int | None = Field(default=None, ge=0)
     current_problem_id: int | None = None
     planned: list[str] | None = None

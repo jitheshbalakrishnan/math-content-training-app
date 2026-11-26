@@ -7,8 +7,8 @@ from fractions import Fraction
 
 
 def _number(text: str) -> Fraction | None:
-    t = text.replace(",", "").replace(" ", "")
-    m = re.fullmatch(r"(-?\d+)\s*(\d+)/(\d+)", text.replace(",", "").strip())   # a mixed number such as 2 1/2
+    t = re.sub(r"\s*/\s*", "/", text.replace(",", "").strip())     # "3 / 4" -> "3/4"; other spaces stay
+    m = re.fullmatch(r"(-?\d+)\s+(\d+)/(\d+)", t)               # a mixed number such as 2 1/2 (space required)
     if m and int(m.group(3)):
         whole, num, den = int(m.group(1)), int(m.group(2)), int(m.group(3))
         return whole + (Fraction(num, den) if whole >= 0 else -Fraction(num, den))

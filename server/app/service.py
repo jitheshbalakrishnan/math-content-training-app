@@ -37,8 +37,26 @@ def _get(db: Session, model, id_: int, what: str):
     return row
 
 
-def _child(db: Session, child_id: int) -> Child:
-    return _get(db, Child, child_id, "child")
+def _child(db: Session, child_id: int, lock: bool = False) -> Child:
+    """lock=True holds this child's row until the request ends, so two requests that change his
+    levels (from two tabs, or a double tap) run one after the other instead of overwriting each other."""
+    row = db.get(Child, child_id, with_for_update=lock)
+    if row is None:
+        raise Problem(404, f"No child {child_id}.")
+    return row
+
+
+def _live_mock_problems():
+    """Problems on any test being prepared or taken, by any child: their keys must stay hidden."""
+    return (select(MockTestItem.problem_id).join(MockTest, MockTest.id == MockTestItem.mock_test_id)
+            .where(MockTest.status.in_(("preparing", "in_progress"))))
+
+
+def _counted_answers(child_id: int):
+    """Answers that count toward days, streaks and points: practice, and tests that were finished.
+    A test still running would give its answers away; an abandoned one is not scored."""
+    return (select(Answer).outerjoin(MockTest, MockTest.id == Answer.mock_test_id)
+            .where(Answer.child_id == child_id, (Answer.mock_test_id.is_(None)) | (MockTest.status == "finished")))
 
 
 def _problem_dict(p: ProblemRow) -> dict:
@@ -107,10 +125,11 @@ def update_child(db: Session, child_id: int, body: schemas.ChildPatch) -> dict:
 def child_summary(db: Session, child_id: int, now: datetime) -> dict:
     """Everything the home and progress screens need, in one call."""
     child = _child(db, child_id)
+    live = live_mock(db, child_id, now)      # first, so a test whose time ran out is scored and counted
     skills = {sp.skill: _skill_dict(sp) for sp in db.scalars(select(SkillProgress).where(SkillProgress.child_id == child_id))}
     since = now - timedelta(days=400)        # enough for any streak worth showing
-    rows = db.execute(select(Answer.answered_at, Answer.correct)
-                      .where(Answer.child_id == child_id, Answer.answered_at >= since)).all()
+    counted = _counted_answers(child_id).subquery()
+    rows = db.execute(select(counted.c.answered_at, counted.c.correct).where(counted.c.answered_at >= since)).all()
     counts: dict = {}
     right_today = 0
     today = local_day(now, TZ)
@@ -118,7 +137,7 @@ def child_summary(db: Session, child_id: int, now: datetime) -> dict:
         d = local_day(at, TZ)
         counts[d] = counts.get(d, 0) + 1
         right_today += int(d == today and correct)
-    points = db.scalar(select(func.coalesce(func.sum(Answer.points), 0)).where(Answer.child_id == child_id))
+    points = db.scalar(select(func.coalesce(func.sum(counted.c.points), 0)))
     best = db.scalars(select(MockTest).where(MockTest.child_id == child_id, MockTest.status == "finished",
                                              MockTest.max_score > 0)
                       .order_by((MockTest.score / MockTest.max_score).desc(), MockTest.finished_at.desc())).first()
@@ -133,7 +152,7 @@ def child_summary(db: Session, child_id: int, now: datetime) -> dict:
         "points": int(points),
         "best_mock": _mock_summary(best) if best else None,
         "open_practice": open_practice(db, child_id),
-        "live_mock": live_mock(db, child_id, now),
+        "live_mock": live,
     }
 
 
@@ -146,12 +165,8 @@ def create_problem(db: Session, body: schemas.ProblemIn) -> dict:
     return _problem_dict(p)
 
 
-def _in_running_test(db: Session, problem_id: int, child_id: int | None = None) -> bool:
-    q = (select(MockTest.id).join(MockTestItem, MockTestItem.mock_test_id == MockTest.id)
-         .where(MockTestItem.problem_id == problem_id, MockTest.status.in_(("preparing", "in_progress"))))
-    if child_id is not None:
-        q = q.where(MockTest.child_id == child_id)
-    return db.scalars(q.limit(1)).first() is not None
+def _in_running_test(db: Session, problem_id: int) -> bool:
+    return bool(db.scalar(select(_live_mock_problems().where(MockTestItem.problem_id == problem_id).exists())))
 
 
 def get_problem(db: Session, problem_id: int) -> dict:
@@ -185,12 +200,15 @@ def _set_skill(sp: SkillProgress, st: dict) -> None:
 
 
 def record_answer(db: Session, child_id: int, body: schemas.AnswerIn, now: datetime) -> dict:
-    _child(db, child_id)
+    _child(db, child_id, lock=True)
     problem = _get(db, ProblemRow, body.problem_id, "problem")
     if problem.status in ("rejected", "retired"):
         raise Problem(409, "That problem has been taken out of use.")
-    if _in_running_test(db, problem.id, child_id):
-        raise Problem(409, "That problem is on your mock test. Answer it there.")
+    if _in_running_test(db, problem.id):
+        raise Problem(409, "That problem is on a mock test right now.")
+    if db.scalar(select(func.count()).select_from(Answer)
+                 .where(Answer.child_id == child_id, Answer.problem_id == problem.id)):
+        raise Problem(409, "This problem was already answered. Use Try again to have another go.")
     if body.practice_session_id is not None:
         s = _get(db, PracticeSession, body.practice_session_id, "practice set")
         if s.child_id != child_id:
@@ -201,23 +219,49 @@ def record_answer(db: Session, child_id: int, body: schemas.AnswerIn, now: datet
     before = _skill_dict(sp)
     after = remember(apply_result(before, correct=correct, hints=body.hints_used), problem.question)
     _set_skill(sp, after)
-    a = Answer(child_id=child_id, problem_id=problem.id, mode=body.mode, level=body.level,
+    a = Answer(child_id=child_id, problem_id=problem.id, mode=body.mode, level=problem.level,
                practice_session_id=body.practice_session_id, chosen_index=body.chosen_index,
                typed_answer=body.typed_answer, correct=correct, hints_used=body.hints_used, seconds=body.seconds,
-               points=points_for(body.level, correct), skill_before=before, answered_at=now)
+               points=points_for(problem.level, correct), skill_before=before, answered_at=now)
     db.add(a)
     db.flush()
     return {"answer_id": a.id, "correct": correct, "points": a.points, "skill": after, "problem": pd}
 
 
-def update_answer(db: Session, child_id: int, answer_id: int, body: schemas.AnswerPatch) -> dict:
-    """A reason, note or retry result added after answering. A changed reason redoes the level change,
-    but only while this is still the latest answer for the skill; later answers have built on it."""
+def _own_answer(db: Session, child_id: int, answer_id: int) -> Answer:
     a = _get(db, Answer, answer_id, "answer")
     if a.child_id != child_id:
         raise Problem(403, "That answer belongs to another child.")
     if a.mode == "mock":
         raise Problem(409, "Mock test answers cannot be changed after the test.")
+    return a
+
+
+def retry_answer(db: Session, child_id: int, answer_id: int, body: schemas.RetryIn) -> dict:
+    """Another go at a missed problem. Marked here; a fix earns 1 point. Levels keep the first answer."""
+    _child(db, child_id, lock=True)
+    a = _own_answer(db, child_id, answer_id)
+    if a.correct:
+        raise Problem(409, "This one was already right.")
+    if a.fixed_on_retry:
+        raise Problem(409, "This one was already fixed.")
+    if a.retries >= 10:
+        raise Problem(409, "That is enough tries for this one. Look at the solution.")
+    problem = db.get(ProblemRow, a.problem_id)
+    fixed = is_correct(_problem_dict(problem), body.chosen_index, body.typed_answer)
+    a.retries += 1
+    a.fixed_on_retry = fixed
+    a.points = points_for(a.level, a.correct, a.trouble_reason == "guess", fixed)
+    db.flush()
+    return {"answer_id": a.id, "fixed": fixed, "retries": a.retries, "points": a.points,
+            "problem": _problem_dict(problem)}
+
+
+def update_answer(db: Session, child_id: int, answer_id: int, body: schemas.AnswerPatch) -> dict:
+    """A reason or note added after answering. A changed reason redoes the level change,
+    but only while this is still the latest answer for the skill; later answers have built on it."""
+    _child(db, child_id, lock=True)          # before reading, so no new answer can slip in between
+    a = _own_answer(db, child_id, answer_id)
     changes = body.model_dump(exclude_unset=True)
     for k, v in changes.items():
         setattr(a, k, v)
@@ -243,7 +287,7 @@ def update_answer(db: Session, child_id: int, answer_id: int, body: schemas.Answ
 
 def set_skill_level(db: Session, child_id: int, skill: str, level: int) -> dict:
     """Placement sets a starting level directly: after a miss, the topic's untried skills start at 2."""
-    _child(db, child_id)
+    _child(db, child_id, lock=True)
     sp = _skill_row(db, child_id, skill)
     sp.level, sp.up, sp.down = level, 0, 0
     db.flush()
@@ -306,8 +350,10 @@ def _mock_summary(m: MockTest) -> dict:
             "finished_at": m.finished_at.isoformat() if m.finished_at else None}
 
 
-def _own_mock(db: Session, child_id: int, mock_id: int, lock: bool = False) -> MockTest:
-    m = db.get(MockTest, mock_id, with_for_update=lock)
+def _own_mock(db: Session, child_id: int, mock_id: int, lock: bool = True) -> MockTest:
+    """Locked and freshly read by default: settling the clock may score the test, and that must
+    wait for an answer being saved at the same moment."""
+    m = db.get(MockTest, mock_id, with_for_update=lock, populate_existing=lock)
     if m is None:
         raise Problem(404, f"No mock test {mock_id}.")
     if m.child_id != child_id:
@@ -328,7 +374,8 @@ def _settle_clock(db: Session, m: MockTest, now: datetime) -> str:
 
 def live_mock(db: Session, child_id: int, now: datetime) -> dict | None:
     m = db.scalars(select(MockTest).where(MockTest.child_id == child_id,
-                                          MockTest.status.in_(("preparing", "in_progress")))).first()
+                                          MockTest.status.in_(("preparing", "in_progress")))
+                   .with_for_update().execution_options(populate_existing=True)).first()
     if m is None:
         return None
     if _settle_clock(db, m, now) not in ("preparing", "in_progress"):
@@ -351,9 +398,13 @@ def create_mock(db: Session, child_id: int, body: schemas.MockIn, now: datetime)
     ids = [it.problem_id for it in body.items]
     if len(set(ids)) != len(ids):
         raise Problem(422, "A test cannot ask the same problem twice.")
-    found = set(db.scalars(select(ProblemRow.id).where(ProblemRow.id.in_(ids))))
+    found = dict(db.execute(select(ProblemRow.id, ProblemRow.status).where(ProblemRow.id.in_(ids))).all())
     if missing := [i for i in ids if i not in found]:
         raise Problem(404, f"No problems {missing}.")
+    if out := [i for i in ids if found[i] in ("rejected", "retired")]:
+        raise Problem(422, f"Problems {out} have been taken out of use.")
+    if seen := sorted(set(seen_problem_ids(db, child_id)) & set(ids)):
+        raise Problem(422, f"Problems {seen} were already answered by this child.")
     m = MockTest(child_id=child_id, contest=body.contest, grade=body.grade, size=body.size, status="preparing",
                  minutes=body.minutes, unit=body.unit, questions=len(ids))
     db.add(m)
@@ -374,6 +425,7 @@ def get_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
     _settle_clock(db, m, now)
     db.flush()
     over = m.status in ("finished", "abandoned")
+    hidden = set(db.scalars(_live_mock_problems())) if over else set()   # on someone else's test right now
     items = db.execute(select(MockTestItem, ProblemRow).join(ProblemRow, ProblemRow.id == MockTestItem.problem_id)
                        .where(MockTestItem.mock_test_id == m.id).order_by(MockTestItem.position)).all()
     given = {a.problem_id: a for a in db.scalars(select(Answer).where(Answer.mock_test_id == m.id))}
@@ -381,10 +433,11 @@ def get_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
     for item, p in items:
         pd = _problem_dict(p)
         a = given.get(p.id)
+        show = over and p.id not in hidden
         row = {"position": item.position, "points": _num(item.points), "label": item.label,
-               "problem": pd if over else _without_key(pd),
+               "problem": pd if show else _without_key(pd),
                "chosen_index": a.chosen_index if a else None, "typed_answer": a.typed_answer if a else None}
-        if over:
+        if show:
             row["correct"] = bool(a and a.correct)
         out.append(row)
     return {**_mock_summary(m), "items": out,
@@ -392,7 +445,7 @@ def get_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
 
 
 def start_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
-    m = _own_mock(db, child_id, mock_id, lock=True)
+    m = _own_mock(db, child_id, mock_id)
     if m.status != "preparing":
         raise Problem(409, f"This test is {m.status.replace('_', ' ')} and cannot be started.")
     m.status, m.started_at, m.last_seen_at = "in_progress", now, now
@@ -402,7 +455,7 @@ def start_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
 
 
 def _running(db: Session, child_id: int, mock_id: int, now: datetime) -> MockTest:
-    m = _own_mock(db, child_id, mock_id, lock=True)
+    m = _own_mock(db, child_id, mock_id)
     if _settle_clock(db, m, now) != "in_progress":
         db.flush()
         raise Problem(409, "This test has ended." if m.status == "finished"
@@ -412,7 +465,7 @@ def _running(db: Session, child_id: int, mock_id: int, now: datetime) -> MockTes
 
 def heartbeat(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
     """The page reports in every few seconds while the test is open."""
-    m = _own_mock(db, child_id, mock_id, lock=True)
+    m = _own_mock(db, child_id, mock_id)
     if _settle_clock(db, m, now) == "in_progress":
         m.last_seen_at = now
     db.flush()
@@ -461,7 +514,7 @@ def _score(db: Session, m: MockTest, now: datetime) -> None:
 
 def finish_mock(db: Session, child_id: int, mock_id: int, now: datetime) -> dict:
     """He presses Finish. Skill levels are left alone: a test measures, practice teaches."""
-    m = _own_mock(db, child_id, mock_id, lock=True)
+    m = _own_mock(db, child_id, mock_id)
     state = _settle_clock(db, m, now)
     if state == "preparing":
         raise Problem(409, "This test has not started yet.")
@@ -484,14 +537,13 @@ def recent_answers(db: Session, child_id: int, limit: int = 20) -> list[dict]:
     """For the Recently answered screen: newest first, with the problem and its key."""
     _child(db, child_id)
     rows = db.execute(select(Answer, ProblemRow).join(ProblemRow, ProblemRow.id == Answer.problem_id)
-                      .where(Answer.child_id == child_id)
+                      .outerjoin(MockTest, MockTest.id == Answer.mock_test_id)
+                      .where(Answer.child_id == child_id,
+                             Answer.mock_test_id.is_(None) | MockTest.status.in_(("finished", "abandoned")),
+                             Answer.problem_id.not_in(_live_mock_problems()))   # filtered before the limit
                       .order_by(Answer.answered_at.desc(), Answer.id.desc()).limit(limit)).all()
     out = []
     for a, p in rows:
-        if a.mock_test_id is not None:
-            m = db.get(MockTest, a.mock_test_id)
-            if m.status not in ("finished", "abandoned"):
-                continue                     # answers in a running test stay hidden
         out.append({"answer_id": a.id, "mode": a.mode, "level": a.level, "correct": a.correct, "points": a.points,
                     "chosen_index": a.chosen_index, "typed_answer": a.typed_answer, "trouble_reason": a.trouble_reason,
                     "fixed_on_retry": a.fixed_on_retry, "answered_at": a.answered_at.isoformat(),

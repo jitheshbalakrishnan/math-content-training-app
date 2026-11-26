@@ -140,3 +140,11 @@ def test_choice_marking_needs_the_key():
 ])
 def test_units_and_extra_text(given, accepted, ok):
     assert typed_matches(given, accepted) is ok
+
+
+@pytest.mark.parametrize("given, accepted, ok", [
+    ("12/3", ["4"], True), ("1 2/3", ["12/3"], False), ("1 2", ["12"], False), ("3 / 4", ["0.75"], True),
+    ("10 1/2", ["21/2"], True),
+])
+def test_fractions_and_mixed_numbers_are_read_correctly(given, accepted, ok):
+    assert typed_matches(given, accepted) is ok

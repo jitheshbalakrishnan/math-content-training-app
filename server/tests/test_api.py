@@ -105,12 +105,18 @@ def test_saying_it_was_a_guess_redoes_the_level_change(api):
     assert r["releveled"] is False
 
 
-def test_a_fixed_retry_earns_one_point(api):
+def test_a_retry_is_marked_by_the_server(api):
     cid = child(api)
     a = api.post(f"/api/children/{cid}/answers",
-                 json={"problem_id": problem(api), "mode": "practice", "level": 3, "chosen_index": 0}).json()
-    r = api.patch(f"/api/children/{cid}/answers/{a['answer_id']}", json={"retries": 1, "fixed_on_retry": True})
-    assert r.json()["points"] == 1
+                 json={"problem_id": problem(api), "mode": "practice", "chosen_index": 0}).json()
+    url = f"/api/children/{cid}/answers/{a['answer_id']}"
+    assert api.patch(url, json={"fixed_on_retry": True}).json()["points"] == 0           # a claim alone earns nothing
+    miss = api.post(url + "/retry", json={"chosen_index": 3}).json()
+    assert (miss["fixed"], miss["retries"], miss["points"]) == (False, 1, 0)
+    fix = api.post(url + "/retry", json={"chosen_index": 1}).json()
+    assert (fix["fixed"], fix["retries"], fix["points"]) == (True, 2, 1)
+    assert api.post(url + "/retry", json={"chosen_index": 1}).status_code == 409
+    assert api.get(f"/api/children/{cid}").json()["skills"]["number.fractions"]["level"] == 3   # levels keep the first answer
 
 
 def test_one_child_cannot_touch_anothers_answers(api):
@@ -239,3 +245,96 @@ def test_a_test_question_key_cannot_be_found_another_way(api):
     assert r.status_code == 409
     api.post(f"/api/children/{cid}/mocks/{m['id']}/finish")
     assert api.get(f"/api/problems/{pid}").json()["answer_index"] == 0
+
+
+
+# ---------- found in review ----------
+
+def test_level_and_points_come_from_the_problem_not_the_page(api):
+    cid = child(api)
+    r = api.post(f"/api/children/{cid}/answers",
+                 json={"problem_id": problem(api, level=1), "mode": "practice", "level": 5, "chosen_index": 1})
+    assert r.json()["points"] == 1
+
+
+def test_the_same_problem_cannot_be_answered_twice(api):
+    cid = child(api)
+    body = {"problem_id": problem(api), "mode": "practice", "chosen_index": 1}
+    assert api.post(f"/api/children/{cid}/answers", json=body).status_code == 201
+    assert api.post(f"/api/children/{cid}/answers", json=body).status_code == 409
+    s = api.get(f"/api/children/{cid}").json()
+    assert (s["points"], s["skills"]["number.fractions"]["attempts"]) == (3, 1)
+
+
+def test_a_running_test_does_not_give_its_answers_away(api):
+    cid = child(api)
+    m = make_mock(api, cid)
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/start")
+    api.put(f"/api/children/{cid}/mocks/{m['id']}/answers/0", json={"chosen_index": 0})      # right
+    s = api.get(f"/api/children/{cid}").json()
+    assert (s["today"], s["points"]) == ({"n": 0, "ok": 0}, 0)
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/finish")
+    s = api.get(f"/api/children/{cid}").json()
+    assert (s["today"], s["points"]) == ({"n": 1, "ok": 1}, 3)
+
+
+def test_an_abandoned_test_earns_nothing(api):
+    cid = child(api)
+    m = make_mock(api, cid)
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/start")
+    api.put(f"/api/children/{cid}/mocks/{m['id']}/answers/0", json={"chosen_index": 0})
+    api.clock.advance(minutes=5)
+    s = api.get(f"/api/children/{cid}").json()
+    assert (s["live_mock"], s["points"], s["today"]["n"]) == (None, 0, 0)
+
+
+def test_keys_stay_hidden_from_a_sibling_while_one_child_takes_a_test(api):
+    sam, ria = child(api), child(api, "Ria")
+    shared = problem(api, n=77, answer_index=2)
+    # Ria finishes a test with the problem, then Sam starts one with it
+    rm = api.post(f"/api/children/{ria}/mocks", json={"contest": "kangaroo", "minutes": 5,
+                                                     "items": [{"problem_id": shared, "points": 3}]}).json()
+    api.post(f"/api/children/{ria}/mocks/{rm['id']}/start")
+    api.put(f"/api/children/{ria}/mocks/{rm['id']}/answers/0", json={"chosen_index": 2})
+    api.post(f"/api/children/{ria}/mocks/{rm['id']}/finish")
+    sm = api.post(f"/api/children/{sam}/mocks", json={"contest": "kangaroo", "minutes": 5,
+                                                     "items": [{"problem_id": shared, "points": 3}]}).json()
+    api.post(f"/api/children/{sam}/mocks/{sm['id']}/start")
+    ria_view = api.get(f"/api/children/{ria}/mocks/{rm['id']}").json()["items"][0]
+    assert "answer_index" not in ria_view["problem"] and "correct" not in ria_view
+    assert api.get(f"/api/children/{ria}/answers").json() == []
+    other = api.post(f"/api/children/{child(api, 'Bo')}/answers", json={"problem_id": shared, "mode": "practice",
+                                                                         "chosen_index": 2})
+    assert other.status_code == 409
+
+
+def test_recent_answers_still_fill_the_page_when_some_are_hidden(api):
+    cid = child(api)
+    for n in range(3):
+        api.post(f"/api/children/{cid}/answers", json={"problem_id": problem(api, n=n), "mode": "practice", "chosen_index": 1})
+    m = make_mock(api, cid, n=3)
+    api.post(f"/api/children/{cid}/mocks/{m['id']}/start")
+    for pos in range(3):
+        api.put(f"/api/children/{cid}/mocks/{m['id']}/answers/{pos}", json={"chosen_index": 0})
+    assert len(api.get(f"/api/children/{cid}/answers?limit=3").json()) == 3
+
+
+def test_a_test_cannot_reuse_seen_or_withdrawn_problems(api, clean):
+    cid = child(api)
+    seen = problem(api, n=1)
+    api.post(f"/api/children/{cid}/answers", json={"problem_id": seen, "mode": "practice", "chosen_index": 1})
+    body = lambda pid: {"contest": "kangaroo", "minutes": 5, "items": [{"problem_id": pid, "points": 3}]}
+    assert api.post(f"/api/children/{cid}/mocks", json=body(seen)).status_code == 422
+    retired = problem(api, n=2)
+    with clean.begin() as c:
+        c.exec_driver_sql(f"UPDATE problems SET status = 'retired' WHERE id = {retired}")
+    assert api.post(f"/api/children/{cid}/mocks", json=body(retired)).status_code == 422
+
+
+def test_nulls_and_blank_keys_are_refused_politely(api):
+    cid = child(api)
+    s = api.post(f"/api/children/{cid}/practice", json={"kind": "daily"}).json()
+    assert api.patch(f"/api/children/{cid}/practice/{s['id']}", json={"position": None}).status_code == 422
+    assert api.patch(f"/api/children/{cid}/practice/{s['id']}", json={"status": None}).status_code == 422
+    typed = {"skill": "x", "level": 3, "question": "q", "answer_kind": "typed", "accepted_answers": ["  "]}
+    assert api.post("/api/problems", json=typed).status_code == 422
