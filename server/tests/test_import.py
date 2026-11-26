@@ -91,3 +91,10 @@ def test_mock_answers_are_linked_to_their_test(tmp_path):
     sql = build(export, "Sam", 5, "Family")
     mock_answer = [line for line in sql.splitlines() if "'mock'" in line and line.startswith("INSERT INTO answers")][0]
     assert ":m0" in mock_answer and "RETURNING id AS m0" in sql
+
+
+def test_old_results_and_problems_do_not_guess_a_contest():
+    sql = build(EXPORT, "Sam", 5, "Family")
+    mock = [line for line in sql.splitlines() if line.startswith("INSERT INTO mock_tests")][0]
+    assert "'kangaroo'" not in mock and "NULL" in mock
+    assert all('"contest"' not in line for line in sql.splitlines() if line.startswith("INSERT INTO problems"))

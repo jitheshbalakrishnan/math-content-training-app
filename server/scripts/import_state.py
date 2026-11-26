@@ -104,7 +104,7 @@ def build(export: Path, child: str, grade: int | None, family: str) -> str:
         if var:
             mock_var[m["at"]] = var
         out.append(insert("mock_tests", {
-            "child_id": ":child_id", "contest": lit(m.get("contest") or (contest if contest in ("kangaroo", "imc", "olympiad") else "kangaroo")),
+            "child_id": ":child_id", "contest": lit(m.get("contest")),   # older results do not say; NULL beats guessing from today's choice
             "size": lit(m.get("size", "full")), "status": lit("finished"), "unit": lit(m.get("unit", "point")),
             "finished_at": lit(m.get("at")), "questions": lit(m.get("n")), "correct": lit(m.get("correct")),
             "score": lit(m.get("score")), "max_score": lit(m.get("max")), "seconds_used": lit(m.get("secs")),
@@ -123,7 +123,6 @@ def build(export: Path, child: str, grade: int | None, family: str) -> str:
             var = seen[key] = f"p{i}"
             out.append(insert("problems", {
                 "skill": lit(a["skill"]), "level": lit(a.get("level", 3)),
-                "contest": lit(contest if contest in ("kangaroo", "imc", "olympiad") else None),
                 "question": lit(q), "choices": lit(a["choices"]), "answer_index": lit(a.get("answer")),
                 "figure": lit(a.get("figure")), "written_by": lit("import"),
             }, returning=var))

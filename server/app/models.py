@@ -181,7 +181,7 @@ class MockTest(Base):
                             postgresql_where=text("status IN ('preparing', 'in_progress')")))
     id: Mapped[int] = pk()
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"), index=True)
-    contest: Mapped[str] = mapped_column(Text)
+    contest: Mapped[str | None] = mapped_column(Text)              # NULL for old results that did not record it
     grade: Mapped[int | None] = mapped_column(SmallInteger)
     size: Mapped[str] = mapped_column(Text, server_default="full")
     status: Mapped[str] = mapped_column(Text, server_default="preparing")
