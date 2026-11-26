@@ -62,7 +62,7 @@ function viewParents() {
     h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-verify', checked: !!S.verify, onchange: ev => { S.verify = ev.target.checked; dropPrepared(); saveState(); render(); } }), 'Solve each problem a second time before showing it'),
     h('p', { class: 'muted small' }, S.verify
       ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
-      : 'Off. Problems appear sooner and are never thrown away, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
+      : 'Off. Problems appear sooner and are never thrown away for failing a check, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
   const setGoal = (key, lo, hi) => ev => { const v = Math.round(Number(ev.target.value)); S.goals = Object.assign({}, goals(), { [key]: Math.max(lo, Math.min(hi, v || lo)) }); saveState(); render(); };
   const goal = h('div', { class: 'sheet' }, h('h3', null, 'Goals'),
     h('div', { class: 'row' },
