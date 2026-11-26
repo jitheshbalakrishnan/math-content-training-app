@@ -1,0 +1,24 @@
+# Which model each agent uses. Change a line here to move an agent to another model
+# or provider; no code changes needed. Live agents answer while the child waits;
+# scheduled agents run in the background (weekly, for now).
+
+[agents.writer]          # live: writes practice and mock test problems
+provider = "anthropic"
+model = "claude-haiku-5-5"
+hard_model = "claude-sonnet-5-5"   # used for levels 4 and 5
+
+[agents.checker]         # live: solves each draft on its own when the answer check is on
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+
+[agents.tutor]           # live: hints and the tutor chat
+provider = "anthropic"
+model = "claude-haiku-5-5"
+
+[agents.reviewer]        # scheduled: re-solves a sample of problems and reads tutor chats
+provider = "anthropic"
+model = "claude-opus-5-5"
+
+[agents.coach]           # scheduled: the weekly summary for parents
+provider = "anthropic"
+model = "claude-sonnet-5-5"

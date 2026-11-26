@@ -35,6 +35,17 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 - Tutor chats are not saved.
 - A mock test in progress or just finished is one document at `data/users/<id>/mock`, also mirrored to `localStorage`. The last 20 results are kept in learner state as `mocks`.
 
+## Local backend (`server/`)
+
+A Python backend for the owner's Mac: Postgres 17, and later the agents. See `server/README.md`.
+
+- `app/models.py` is the schema; each migration in `migrations/versions/` must match it (`tests/test_schema.py` checks).
+- Every row that belongs to a child carries `child_id`. Problems belong to no child; one child never gets the same problem twice.
+- Status columns are text with a CHECK constraint, not Postgres enums.
+- Each agent's model lives in `config/agents.toml`, never in code.
+- Learner data and source papers stay out of the repo: exports, `import.sql` and PDFs are ignored by git. Past-paper questions may go into the owner's local database, never into the repo.
+- Secrets come from `.env` at the repo root, never committed.
+
 ## Skill map conventions
 
 - Skill ids are `topic.name`. Skills added by a parent in the app get `custom.<id>` and live in learner state, not in this file.
@@ -47,6 +58,8 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 ## Testing
 
 There is no test suite yet. Changes have been checked with a headless browser and stand-ins for Claude and storage, which proves the flow but not the quality of real generated problems. Say which of the two a change was tested with.
+
+For `server/`: `uv run pytest` runs without a database; set `TEST_DATABASE_URL` to an empty scratch database to also check the migration and the import against Postgres.
 
 ## Working agreement
 

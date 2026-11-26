@@ -1,0 +1,17 @@
+[project]
+name = "math-trainer-server"
+version = "0.1.0"
+description = "Local backend for Math Contest Trainer: Postgres storage and agents"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.13",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
