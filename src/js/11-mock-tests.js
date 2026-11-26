@@ -97,6 +97,7 @@ function finishMock() {
   m.usedSecs = Math.round((Math.min(Date.now(), m.endsAt) - m.started) / 1000);
   const r = mockScore(m), at = new Date().toISOString();
   S.mocks = (S.mocks || []).concat({ at, size: m.size, n: m.items.length, correct: r.correct, score: r.score, max: r.max, secs: m.usedSecs, unit: m.unit || 'point' }).slice(-20);
+  tally(m.answers.filter(a => a != null).length, r.correct);     // test questions he answered count toward the day and the week
   saveState(); saveMock();          // skill levels are left alone: a test measures, practice teaches
   m.items.forEach((it, i) => logAttempt({ at, skill: it.skill, level: it.level, mode: 'mock', question: it.p.question, figure: it.p.figure || null, choices: it.p.choices, answer: it.p.answer, picked: m.answers[i], correct: m.answers[i] === it.p.answer, ms: null, hints: 0, reason: null, note: '' }));
   render();

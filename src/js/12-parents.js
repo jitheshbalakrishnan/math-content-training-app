@@ -63,6 +63,12 @@ function viewParents() {
     h('p', { class: 'muted small' }, S.verify
       ? 'On. A problem is shown only when a second, independent solution agrees with its answer. Slower, and some problems are thrown away and rewritten.'
       : 'Off. Problems appear sooner and are never thrown away, but now and then one may have a wrong answer key. The tutor is told the key is unchecked and to say so if it finds a mistake.'));
-  return [form, list, check];
+  const setGoal = (key, lo, hi) => ev => { const v = Math.round(Number(ev.target.value)); S.goals = Object.assign({}, goals(), { [key]: Math.max(lo, Math.min(hi, v || lo)) }); saveState(); render(); };
+  const goal = h('div', { class: 'sheet' }, h('h3', null, 'Goals'),
+    h('div', { class: 'row' },
+      h('div', { class: 'field' }, h('label', { for: 'pt-day' }, 'Problems a day'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-day', value: goals().day, onchange: setGoal('day', 3, 30) })),
+      h('div', { class: 'field' }, h('label', { for: 'pt-week' }, 'Problems a week'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-week', value: goals().week, onchange: setGoal('week', 10, 200) }))),
+    h('p', { class: 'muted small' }, 'The daily goal is the size of "today\'s set" on his Home screen. Reaching it does not stop him practicing. Daily goal 3 to 30, weekly goal 10 to 200.'));
+  return [form, list, goal, check];
 }
 
