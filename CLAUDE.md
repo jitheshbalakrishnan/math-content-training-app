@@ -43,6 +43,9 @@ A Python backend for the owner's Mac: Postgres 17, and later the agents. See `se
 - Every row that belongs to a child carries `child_id`. Problems belong to no child; one child never gets the same problem twice.
 - Status columns are text with a CHECK constraint, not Postgres enums.
 - Each agent's model lives in `config/agents.toml`, never in code.
+- The server marks answers, changes levels and gives points (`app/rules/`); it never trusts the page for these. Keep `app/rules/leveling.py` and `src/js/03-leveling.js` the same rule until the page uses the API.
+- Mock test keys stay hidden from the API until the test is finished or abandoned.
+- A migration that has been merged is never edited; changes go in a new one.
 - Learner data and source papers stay out of the repo: exports, `import.sql` and PDFs are ignored by git. Past-paper questions may go into the owner's local database, never into the repo.
 - Secrets come from `.env` at the repo root, never committed.
 

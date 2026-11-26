@@ -10,7 +10,7 @@ migration. Skill ids refer to skill_map.json, which stays a file in the repo.
 from datetime import date, datetime
 
 from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Identity, Index,
-                        Integer, Numeric, SmallInteger, Text, UniqueConstraint, func, text)
+                        ForeignKeyConstraint, Integer, Numeric, SmallInteger, Text, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -157,6 +157,7 @@ class PracticeSession(Base):
     __tablename__ = "practice_sessions"
     __table_args__ = (one_of("kind", "placement", "daily", "topic"), one_of("status", "open", "done"),
                       Index("practice_open", "child_id", "status"),
+                      UniqueConstraint("id", "child_id", name="practice_sessions_id_child_key"),
                       Index("practice_one_open", "child_id", unique=True, postgresql_where=text("status = 'open'")))
     id: Mapped[int] = pk()
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"))
@@ -177,6 +178,7 @@ class MockTest(Base):
     __tablename__ = "mock_tests"
     __table_args__ = (one_of("status", "preparing", "in_progress", "finished", "abandoned"),
                       CheckConstraint("ends_at IS NULL OR started_at IS NULL OR ends_at > started_at", name="clock_order"),
+                      UniqueConstraint("id", "child_id", name="mock_tests_id_child_key"),
                       Index("mock_one_live", "child_id", unique=True,
                             postgresql_where=text("status IN ('preparing', 'in_progress')")))
     id: Mapped[int] = pk()
@@ -217,6 +219,10 @@ class Answer(Base):
                       level_range(),
                       CheckConstraint("points BETWEEN 0 AND 5", name="points_range"),
                       CheckConstraint("mock_test_id IS NULL OR mode = 'mock'", name="mock_link"),
+                      ForeignKeyConstraint(["practice_session_id", "child_id"], ["practice_sessions.id", "practice_sessions.child_id"],
+                                           name="answers_session_same_child"),
+                      ForeignKeyConstraint(["mock_test_id", "child_id"], ["mock_tests.id", "mock_tests.child_id"],
+                                           name="answers_mock_same_child", ondelete="CASCADE"),
                       Index("answers_by_child", "child_id", "answered_at"),
                       Index("answers_seen", "child_id", "problem_id"),
                       Index("answers_one_per_mock_problem", "mock_test_id", "problem_id", unique=True,
@@ -238,6 +244,7 @@ class Answer(Base):
     retries: Mapped[int] = mapped_column(SmallInteger, server_default="0")
     fixed_on_retry: Mapped[bool] = mapped_column(Boolean, server_default="false")
     points: Mapped[int] = mapped_column(SmallInteger, server_default="0")   # reward points earned
+    skill_before: Mapped[dict | None] = mapped_column(JSONB)       # the skill just before this answer, to redo a correction
     answered_at: Mapped[datetime] = created()
 
 
