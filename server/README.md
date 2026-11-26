@@ -1,9 +1,8 @@
 # Local backend
 
-The part of Math Contest Trainer that runs on your Mac: a Postgres database and, later, the
-agents that write problems and tutor. This first step is the database and the import of
-progress from the hosted app. The page still runs in Claude and still saves there; it is
-switched over in a later change.
+The part of Math Contest Trainer that runs on your Mac: a Postgres database, an API, and
+later the agents that write problems and tutor. The page still runs in Claude and still
+saves there; it is switched over to this API in a later change.
 
 ## One-time setup
 
@@ -25,6 +24,35 @@ DATABASE_URL=postgresql+psycopg:///math_trainer
 
 `DATABASE_URL` can be left out when the database is called `math_trainer` on this Mac.
 
+## Run the API
+
+```bash
+uv run alembic upgrade head          # after every git pull, in case there is a new migration
+uv run uvicorn app.main:app --port 8000
+```
+
+Then open http://localhost:8000/docs to see and try every route. Only this Mac can reach it.
+Adding `--host 0.0.0.0` lets other devices at home use it, but there is no sign-in yet, so
+anyone on your home network could.
+
+Optional settings in `.env`: `APP_TIMEZONE` (default `America/New_York`, used for daily counts
+and streaks) and `CORS_ORIGINS` (comma-separated, for a page served from another address).
+
+### What it does
+
+| Route | For |
+|---|---|
+| `GET /api/children`, `POST /api/children` | The "who's practicing?" list; add a child |
+| `GET /api/children/{id}` | Home and progress in one call: skills, today, week, streak, points, best test, open practice set, live test |
+| `PATCH /api/children/{id}` | Contest, focus, goals, grade, settings |
+| `POST /api/problems` | Store a written problem; its key is checked |
+| `POST /api/children/{id}/answers` | Record an answer. The server marks it, changes the level and gives points |
+| `PATCH /api/children/{id}/answers/{answer}` | His reason, a note, or a retry result. Saying it was a guess redoes the level change while it is the latest answer for that skill |
+| `GET /api/children/{id}/answers` | Recently answered, newest first |
+| `GET /api/children/{id}/seen` | Problems he has already had, so none repeats |
+| `POST /api/children/{id}/practice` | Start a practice set, or get the open one back |
+| `POST /api/children/{id}/mocks` … `/start`, `/heartbeat`, `/answers/{n}`, `/finish` | Mock tests: keys hidden until the end, last answer kept, scored when time runs out, abandoned after two minutes away |
+
 ## Import progress from the hosted app
 
 1. Export the learner's saved data into a folder outside the repo (Claude can do this
@@ -43,6 +71,9 @@ It runs in one transaction and does nothing if that child is already there.
 
 | Path | What it holds |
 |---|---|
+| `app/main.py` | The API routes |
+| `app/service.py` | What each route does |
+| `app/rules/` | Leveling, marking, the mock test clock, days and streaks: plain Python |
 | `app/models.py` | The tables, as SQLAlchemy models |
 | `app/points.py` | The reward points rule |
 | `app/config.py` | Settings, and each agent's model from `config/agents.toml` |
@@ -60,7 +91,7 @@ using it). `tests/test_schema.py` fails if the models and the migrations disagre
 ## Tests
 
 ```bash
-uv run pytest                                   # no database needed
+uv run pytest                                   # the rules and the import, no database needed
 createdb math_trainer_test
-TEST_DATABASE_URL=postgresql+psycopg:///math_trainer_test uv run pytest   # also checks a real database
+TEST_DATABASE_URL=postgresql+psycopg:///math_trainer_test uv run pytest   # also the API and migrations
 ```
