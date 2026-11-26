@@ -1,19 +1,23 @@
 # Which model each agent uses. Change a line here to move an agent to another model
 # or provider; no code changes needed. Live agents answer while the child waits;
 # scheduled agents run in the background (weekly, for now).
+# max_tokens caps the length of each reply.
 
 [agents.writer]          # live: writes practice and mock test problems
 provider = "anthropic"
 model = "claude-haiku-5-5"
-hard_model = "claude-sonnet-5-5"   # used for levels 4 and 5
+hard_model = "claude-sonnet-5-5"   # used when the Parents page sets problem writing to "stronger"
+max_tokens = 4000
 
 [agents.checker]         # live: solves each draft on its own when the answer check is on
 provider = "anthropic"
 model = "claude-sonnet-5-5"
+max_tokens = 2000
 
 [agents.tutor]           # live: hints and the tutor chat
 provider = "anthropic"
 model = "claude-haiku-5-5"
+max_tokens = 1500
 
 [agents.reviewer]        # scheduled: re-solves a sample of problems and reads tutor chats
 provider = "anthropic"

@@ -45,6 +45,7 @@ A Python backend for the owner's Mac: Postgres 17, and later the agents. See `se
 - Each agent's model lives in `config/agents.toml`, never in code.
 - The server marks answers, changes levels and gives points (`app/rules/`); it never trusts the page for these. Keep `app/rules/leveling.py` and `src/js/03-leveling.js` the same rule until the page uses the API.
 - Mock test keys stay hidden from the API until the test is finished or abandoned.
+- The page can also be served by the server (`GET /`). There, `env.local` is true and `env.sample` is `localSample()` (`src/js/12b-local-server.js`), which sends each call to `/api/claude` with its agent: `writer`, `checker` or `tutor`. Pass the agent through `withAgent()`, never directly, because Claude's own page does not accept the option. The key stays on the server.
 - A migration that has been merged is never edited; changes go in a new one.
 - Learner data and source papers stay out of the repo: exports, `import.sql` and PDFs are ignored by git. Past-paper questions may go into the owner's local database, never into the repo.
 - Secrets come from `.env` at the repo root, never committed.

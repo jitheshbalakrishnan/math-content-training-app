@@ -35,12 +35,12 @@ async function tutorSend(text, hidden) {
   const timer = setTimeout(() => { late = true; c.ctl.abort(); }, CALL_LIMIT_MS);   // same limit as problem writing
   renderChat();
   try {
-    const r = await env.sample(turns, { cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } });
+    const r = await env.sample(turns, withAgent({ cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } }, 'tutor'));
     reply.content = r.text;
   } catch (e) {
     reply.content = (e && e.text) || '';
     if (late) reply.error = 'The tutor took too long to answer, so it was stopped. Ask again.';
-    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
+    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : e && (e.code === 'no_key' || e.code === 'offline') ? errCopy(e) : "The tutor couldn't answer just now. Ask again.";
     if (!reply.content && !reply.error) c.chat.splice(c.chat.indexOf(reply), 1);
   }
   clearTimeout(timer);

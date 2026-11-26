@@ -124,3 +124,16 @@ class MockAnswerIn(BaseModel):
 
 class SkillLevelIn(BaseModel):
     level: int = Level
+
+
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=60_000)
+
+
+class ClaudeIn(BaseModel):
+    """One call for a live agent. The server picks the model from config/agents.toml."""
+    agent: Literal["writer", "checker", "tutor"]
+    messages: list[Turn] = Field(min_length=1, max_length=40)
+    tier: Literal["quick", "default"] | None = None
+    child_id: int | None = None
