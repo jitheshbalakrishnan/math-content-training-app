@@ -711,7 +711,9 @@ function check() {
   if (c.picked == null || c.checked) return;
   c.checked = true; c.correct = c.picked === c.p.answer; c.ms = Date.now() - c.t0;
   c.before = clone(skillState(id));
+  const goal = goals().day, soFar = doneToday();
   tally(1, c.correct ? 1 : 0);
+  c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
@@ -869,6 +871,15 @@ function viewPractice() {
   if (!(env.ready && S.contest && env.sample)) return body;
   return cur && cur.p ? [topicPicker(), withPad(cur.p, ...body)] : [topicPicker(), ...body];
 }
+function progressLine(c, t) {        // where he is in the placement, or in today's set
+  if (t.mode === 'placement') {
+    const i = S.placement.i, total = S.placement.queue.length;
+    return h('div', { class: 'setline' }, h('b', null, 'Problem ' + (i + 1) + ' of ' + total), setBar(c.checked ? i + 1 : i, total, c.checked ? -1 : i));
+  }
+  const goal = goals().day, done = doneToday(), number = c.checked ? done : done + 1;      // an answered problem is already in the tally
+  if (number > goal) return h('div', { class: 'setline' }, h('b', null, "Today's set is done"), h('span', { class: 'muted' }, 'Extra practice, problem ' + number + ' today'));
+  return h('div', { class: 'setline' }, h('b', null, 'Problem ' + number + ' of ' + goal + ' today'), setBar(done, goal, c.checked ? -1 : done));
+}
 function viewPracticeBody() {
   if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading your progress'))];
   if (!S.contest) return [h('div', { class: 'sheet' },
@@ -890,7 +901,7 @@ function viewPracticeBody() {
   const t = cur.target, sk = SK[t.skill];
   const meta = h('div', { class: 'meta' },
     h('span', { class: 'skill' }, sk.name), levelDots(t.level),
-    h('span', null, t.mode === 'placement' ? 'Placement ' + (S.placement.i + 1) + ' of ' + S.placement.queue.length
+    h('span', null, t.mode === 'placement' ? 'Finding your level'
       : 'Level ' + t.level + ((S.contest === 'kangaroo' || S.contest === 'both') && sk.contests.includes('kangaroo') ? ', about a ' + (t.level <= 2 ? 3 : t.level <= 4 ? 4 : 5) + '-point Kangaroo question' : '')),
     t.mode === 'retry' ? h('span', null, 'A similar one to try again') : null);
   if (cur.loading) return [h('div', { class: 'sheet' }, meta,
@@ -913,7 +924,7 @@ function viewPracticeBody() {
     return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : ''), type: 'button', disabled: !open || wrong, 'aria-pressed': open && (c.retrying ? c.pick2 : c.picked) === i ? 'true' : 'false', onclick: () => { if (c.retrying) c.pick2 = i; else c.picked = i; render(); } },
       h('b', null, LETTERS[i]), h('span', null, p.choice_figures ? figureEl(p.choice_figures[i], true) : txt), right ? h('em', null, 'Correct') : wrong ? h('em', null, missed.length > 1 ? 'Tried' : 'Your answer') : null);
   }));
-  const out = [meta];
+  const out = [progressLine(c, t), meta];
   if (placedNote && t.mode !== 'placement') out.push(h('p', { class: 'notice' }, 'Placement done. From here each skill adjusts on its own.'));
   out.push(h('div', null, h('p', { class: 'question' }, p.question), canSpeak ? h('button', { class: 'say', type: 'button', onclick: () => speak(p.question + '. ' + p.choices.map((x, i) => LETTERS[i] + ': ' + x).join('. ')) }, 'Read this aloud') : null));
   if (p.figure) out.push(figureEl(p.figure));
