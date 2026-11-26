@@ -85,8 +85,8 @@ input[type=text]{font:inherit;color:var(--ink);background:var(--sheet);border:0;
 .rev summary{cursor:pointer;font-family:var(--display);font-weight:700}
 .rev>div{display:flex;flex-direction:column;gap:12px;padding-top:10px}
 .tally{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;font-variant-numeric:tabular-nums}
-.pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
-.pick select{width:auto;flex:1 1 14rem;max-width:24rem;min-height:46px}
+.pick{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:8px 12px;max-width:34rem}
+.pick select{width:100%;min-height:46px}
 .field{display:flex;flex-direction:column;gap:4px}
 .field input[type=text]{flex:none;width:100%}
 label,legend{font-weight:700}
@@ -233,9 +233,9 @@ function applyResult(st, r) {
 function focusSkills() {              // the skills in play: one topic if the student picked one, otherwise all of them
   const all = contestSkills();
   if (!S.focus) return all;
-  const some = all.filter(s => s.topic === S.focus);
+  const some = all.filter(s => s.id === S.focus || s.topic === S.focus);     // the choice is one skill or a whole topic
   if (some.length) return some;
-  S.focus = null;                    // the chosen topic has no skills left, so fall back to the mix
+  S.focus = null;                    // the chosen topic or skill is not in play any more, so fall back to the mix
   return all;
 }
 function pickNext(excludeId) {
@@ -569,7 +569,7 @@ function errCopy(e) {
 /* ---------- practice flow ---------- */
 function nextTarget() {
   const pool = focusSkills();        // also clears a chosen topic that has no skills left
-  if (!S.focus) {                    // placement waits while the student practises a chosen topic
+  if (!S.focus) {                    // placement waits while the student practices a chosen topic
     while (!S.placement.done && !SK[S.placement.queue[S.placement.i]]) {   // skip a placement slot whose topic was removed
       S.placement.i++;
       if (S.placement.i >= S.placement.queue.length) S.placement.done = true;
@@ -670,7 +670,7 @@ function tutorRules(c) {
     : c.correct ? 'He answered ' + LETTERS[c.picked] + ', which is correct.' + (c.reason === 'guess' ? ' He says he guessed.' : '')
     : 'He answered ' + LETTERS[c.picked] + ' ("' + p.choices[c.picked] + '"), which is wrong.' + (c.reason ? ' He says: ' + REASON_TEXT[c.reason] + '.' : '') + (c.note ? ' His note: "' + c.note + '"' : '');
   return [
-    'You are a patient math tutor for a grade 5-6 student practising for math contests. Follow these rules in every reply.',
+    'You are a patient math tutor for a grade 5-6 student practicing for math contests. Follow these rules in every reply.',
     '- Use simple words. Keep each reply under 80 words. Ask one question or give one step at a time.',
     '- Guide with questions and the smallest hint that unblocks him. First find out what he was thinking.',
     '- Do not state the final answer or the correct letter unless he has already answered the problem and either asks to see it or has made two real attempts in this chat.',
@@ -744,19 +744,36 @@ function levelDots(n) { return h('span', { class: 'lv', role: 'img', 'aria-label
 function busyLine(t) { return h('p', null, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), t); }
 
 function chooseTopic(id) {
-  S.focus = id && TOPIC[id] ? id : null;
+  S.focus = id && (TOPIC[id] || SK[id]) ? id : null;
   S.planned = null; S.retry = null;
   dropPrepared();                    // problems prepared for the old choice are no longer wanted
   saveState();
   if (cur && !(cur.p && cur.checked)) { if (cur.ctl) cur.ctl.abort(); loadProblem(); }   // swap an unanswered problem right away
   else render();                     // an answered one stays up; the choice applies from the next problem
 }
+function switchContest(key) {        // change what he is training for without losing progress on any skill
+  if (!CONTESTS[key] || key === S.contest) return;
+  const placed = S.placement.done;
+  chooseContest(key);                // sets the contest and builds a placement for it
+  if (placed) S.placement.done = true;         // already placed once: skills new to him simply start at level 3
+  S.focus = null; S.planned = null; S.retry = null;
+  dropPrepared();
+  if (live) live.abort();
+  if (cur && cur.ctl) cur.ctl.abort();
+  cur = null;
+  saveState(); render();
+}
 function topicPicker() {
-  const inPlay = TOPICS.filter(tp => contestSkills().some(s => s.topic === tp.id));
-  return h('div', { class: 'pick' }, h('label', { for: 'topic-pick' }, 'What to practise'),
+  const inPlay = contestSkills();
+  return h('div', { class: 'pick' },
+    h('label', { for: 'contest-pick' }, 'Training for'),
+    h('select', { id: 'contest-pick', onchange: ev => switchContest(ev.target.value) }, Object.keys(CONTESTS).map(k => h('option', { value: k, selected: S.contest === k }, CONTESTS[k]))),
+    h('label', { for: 'topic-pick' }, 'What to practice'),
     h('select', { id: 'topic-pick', onchange: ev => chooseTopic(ev.target.value) },
       h('option', { value: '', selected: !S.focus }, 'A mix of everything'),
-      inPlay.map(tp => h('option', { value: tp.id, selected: S.focus === tp.id }, tp.name))));
+      TOPICS.filter(tp => inPlay.some(x => x.topic === tp.id)).map(tp => h('optgroup', { label: tp.name },
+        h('option', { value: tp.id, selected: S.focus === tp.id }, 'All of ' + tp.name),
+        inPlay.filter(x => x.topic === tp.id).map(x => h('option', { value: x.id, selected: S.focus === x.id }, x.name))))));
 }
 function viewPractice() {
   if (env.ready && S.contest) focusSkills();        // drop a chosen topic that no longer has skills
@@ -769,10 +786,10 @@ function viewPracticeBody() {
     h('h2', null, 'Which contest are you training for?'),
     h('p', { class: 'muted' }, 'You start with a few medium problems, one per topic. After that, every skill moves up or down on its own as you answer.'),
     h('div', { class: 'row' }, Object.keys(CONTESTS).map(k => h('button', { class: 'btn', type: 'button', onclick: () => chooseContest(k) }, CONTESTS[k]))))];
-  if (!env.sample) return [h('div', { class: 'sheet' }, h('h2', null, 'Open this page in Claude to practise'), h('p', { class: 'muted' }, 'Problems and tutor replies are written by Claude, which is not available in this view.'))];
+  if (!env.sample) return [h('div', { class: 'sheet' }, h('h2', null, 'Open this page in Claude to practice'), h('p', { class: 'muted' }, 'Problems and tutor replies are written by Claude, which is not available in this view.'))];
   if (!cur && S.focus) return [h('div', { class: 'sheet' },
-    h('h2', null, TOPIC[S.focus]),
-    h('p', { class: 'muted' }, 'Problems from this topic only. Each skill in it still moves up or down as you answer. Switch back to a mix whenever you like.'),
+    h('h2', null, SK[S.focus] ? SK[S.focus].name : TOPIC[S.focus]),
+    h('p', { class: 'muted' }, SK[S.focus] ? 'Problems on this one skill only. It still moves up or down as you answer. Switch back to a mix whenever you like.' : 'Problems from this topic only. Each skill in it still moves up or down as you answer. Switch back to a mix whenever you like.'),
     h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Start')))];
   if (!cur) {
     const pl = S.placement, fresh = !pl.done && pl.i === 0;
