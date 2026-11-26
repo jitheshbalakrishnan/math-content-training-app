@@ -151,6 +151,15 @@ a.btn{text-decoration:none;display:flex;align-items:center}
 .week i.on{background:var(--ink);border-color:var(--ink)}
 .week i.today{border-color:var(--margin)}
 .tag{font-size:.8rem;font-weight:700;background:var(--bad-bg);color:var(--bad);padding:1px 8px;margin-left:8px;white-space:nowrap}
+.burst{position:relative;display:inline-block;width:0;height:0;vertical-align:middle;margin-left:16px}
+.burst i{position:absolute;left:0;top:0;width:9px;height:9px;background:var(--c);opacity:0;animation:fly .75s ease-out forwards}
+@keyframes fly{0%{transform:translate(0,0) rotate(0);opacity:1}100%{transform:translate(var(--dx),var(--dy)) rotate(220deg);opacity:0}}
+.pop{animation:pop .35s ease-out}
+@keyframes pop{0%{transform:scale(.7)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
+.shake{animation:shake .3s ease-in-out}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.cheer{background:var(--hl);color:var(--on-hl);padding:10px 14px;font-family:var(--display);font-weight:700;font-size:1.1rem;transform-origin:left center}
+@media (prefers-reduced-motion:reduce){ .burst{display:none} .pop,.shake{animation:none} }
 </style>
 
 <div class="book">
@@ -713,6 +722,7 @@ function check() {
   c.before = clone(skillState(id));
   const goal = goals().day, soFar = doneToday();
   tally(1, c.correct ? 1 : 0);
+  c.fresh = true;
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
@@ -722,6 +732,7 @@ function check() {
 function checkRetry() {              // another go at a missed question; stats and level keep the first answer
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
+  c.fresh = true;
   if (c.pick2 === c.p.answer) c.fixed = true;
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;
@@ -829,6 +840,14 @@ function chatBlock(c) {
     h('p', { class: 'muted small' }, "To talk, tap the microphone key on your keyboard. The tutor won't give the answer away before you try."));
 }
 
+/* ---------- celebrations: a short moment for a right answer, a level-up and finishing the day's set ---------- */
+function burst() {                   // a ring of paper squares flying out; decoration only, hidden from screen readers
+  const colors = ['--hl', '--good', '--ink', '--margin'];
+  return h('span', { class: 'burst', 'aria-hidden': 'true' }, Array.from({ length: 14 }, (_, i) => {
+    const angle = (i / 14) * Math.PI * 2, reach = 44 + (i % 3) * 16;
+    return h('i', { style: '--dx:' + Math.round(Math.cos(angle) * reach) + 'px;--dy:' + Math.round(Math.sin(angle) * reach) + 'px;--c:var(' + colors[i % 4] + ')' });
+  }));
+}
 /* ---------- views ---------- */
 function levelDots(n) { return h('span', { class: 'lv', role: 'img', 'aria-label': 'Level ' + n + ' of 5' }, [1, 2, 3, 4, 5].map(i => h('i', { class: i <= n ? 'on' : '' }))); }
 function busyLine(t) { return h('p', null, h('span', { class: 'dots' }, h('i'), h('i'), h('i')), t); }
@@ -915,13 +934,14 @@ function viewPracticeBody() {
     h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: loadProblem }, 'Try again')))];
 
   const c = cur, p = c.p, st = skillState(t.skill);
+  const fresh = !!c.fresh; c.fresh = false;             // true only for the first drawing after an answer, so animations play once
   const missed = c.checked && !c.correct ? [c.picked].concat(c.missed || []) : [];     // every choice he has tried and got wrong
   const showRight = c.checked && (c.correct || c.revealed || c.fixed);
   const open = !c.checked || c.retrying;
   const canRetry = c.checked && !c.correct && !c.fixed && !c.revealed && !c.retrying && missed.length < p.choices.length - 1;
   const choices = h('div', { role: 'group', 'aria-label': 'Answer choices' }, p.choices.map((txt, i) => {
     const right = showRight && i === p.answer, wrong = missed.includes(i);
-    return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : ''), type: 'button', disabled: !open || wrong, 'aria-pressed': open && (c.retrying ? c.pick2 : c.picked) === i ? 'true' : 'false', onclick: () => { if (c.retrying) c.pick2 = i; else c.picked = i; render(); } },
+    return h('button', { class: 'choice' + (p.choice_figures ? ' pic' : '') + (right ? ' right' : wrong ? ' wrong' : '') + (fresh && wrong && i === missed[missed.length - 1] ? ' shake' : ''), type: 'button', disabled: !open || wrong, 'aria-pressed': open && (c.retrying ? c.pick2 : c.picked) === i ? 'true' : 'false', onclick: () => { if (c.retrying) c.pick2 = i; else c.picked = i; render(); } },
       h('b', null, LETTERS[i]), h('span', null, p.choice_figures ? figureEl(p.choice_figures[i], true) : txt), right ? h('em', null, 'Correct') : wrong ? h('em', null, missed.length > 1 ? 'Tried' : 'Your answer') : null);
   }));
   const out = [progressLine(c, t), meta];
@@ -937,7 +957,7 @@ function viewPracticeBody() {
   } else {
     const moved = st.level - c.before.level;
     out.push(h('hr'));
-    out.push(h('p', { class: 'verdict ' + (c.correct || c.fixed ? 'good' : 'bad') }, c.correct ? 'Correct' : c.fixed ? 'Correct on try ' + (missed.length + 1) : c.retrying ? 'Pick another answer' : 'Not this one'));
+    out.push(h('p', { class: 'verdict ' + (c.correct || c.fixed ? 'good' : 'bad') + (fresh ? ' pop' : '') }, c.correct ? 'Correct' : c.fixed ? 'Correct on try ' + (missed.length + 1) : c.retrying ? 'Pick another answer' : 'Not this one', fresh && (c.correct || c.fixed) ? burst() : null));
     if (c.retrying) {                 // a second go at the same question; the first answer is the one that counts for his level
       out.push(h('div', { class: 'row' },
         h('button', { class: 'btn primary', type: 'button', disabled: c.pick2 == null, onclick: checkRetry }, 'Check answer'),
@@ -945,7 +965,8 @@ function viewPracticeBody() {
       out.push(chatBlock(c));
       return [h('div', { class: 'sheet' }, out)];
     }
-    if (moved && t.mode !== 'placement') out.push(h('p', null, moved > 0 ? 'Two in a row. This skill moves up to level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
+    if (moved && t.mode !== 'placement') out.push(h('p', { class: moved > 0 ? 'cheer' + (fresh ? ' pop' : '') : '' }, moved > 0 ? 'Level up. ' + SK[t.skill].name + ' is now level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
+    if (c.setDone) out.push(h('p', { class: 'cheer' + (fresh ? ' pop' : '') }, "Today's set is done. Nice work."));
     if (c.correct) {
       out.push(h('div', { class: 'row' },
         h('button', { class: 'btn quiet', type: 'button', 'aria-pressed': c.reason === 'guess' ? 'true' : 'false', onclick: () => setFeedback({ reason: c.reason === 'guess' ? null : 'guess' }) }, 'I guessed this one'),
