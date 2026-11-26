@@ -10,18 +10,23 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import sys
+
 import pytest
 
 URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="TEST_DATABASE_URL is not set")
 SERVER = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(SERVER), str(SERVER / "scripts")]
 
 
 @pytest.fixture(scope="module")
 def engine():
     sa = pytest.importorskip("sqlalchemy")
-    os.environ["DATABASE_URL"] = URL
     eng = sa.create_engine(URL)
+    if eng.url.database == "math_trainer":
+        pytest.fail("TEST_DATABASE_URL points at the real database; use an empty scratch one")
+    os.environ["DATABASE_URL"] = URL
     with eng.begin() as c:
         c.exec_driver_sql("DROP SCHEMA public CASCADE; CREATE SCHEMA public;")
     subprocess.run(["alembic", "upgrade", "head"], cwd=SERVER, check=True, env=os.environ)
@@ -43,7 +48,7 @@ def test_migration_matches_the_models(engine):
 def test_import_runs_and_refuses_a_second_time(engine):
     if not shutil.which("psql"):
         pytest.skip("psql is not installed")
-    from import_state import build  # tests/test_import.py put scripts/ on the path
+    from import_state import build
 
     sql = build(SERVER / "tests" / "fixtures" / "sample_export", "Sam", 5, "Family")
     libpq = engine.url.set(drivername="postgresql").render_as_string(hide_password=False)

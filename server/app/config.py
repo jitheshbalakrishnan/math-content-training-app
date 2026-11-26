@@ -9,6 +9,9 @@ ROOT = Path(__file__).resolve().parents[2]          # the repo root
 load_dotenv(ROOT / ".env")
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql+psycopg:///math_trainer")
+for plain in ("postgresql://", "postgres://"):      # the usual form: use the psycopg 3 driver that is installed
+    if DATABASE_URL.startswith(plain):
+        DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len(plain):]
 SKILL_MAP = ROOT / "skill_map.json"
 AGENTS_FILE = Path(__file__).resolve().parents[1] / "config" / "agents.toml"
 

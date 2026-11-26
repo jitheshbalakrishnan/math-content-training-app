@@ -10,7 +10,7 @@ migration. Skill ids refer to skill_map.json, which stays a file in the repo.
 from datetime import date, datetime
 
 from sqlalchemy import (BigInteger, Boolean, CheckConstraint, Date, DateTime, ForeignKey, Identity, Index,
-                        Integer, Numeric, SmallInteger, Text, func)
+                        Integer, Numeric, SmallInteger, Text, UniqueConstraint, func, text)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -31,6 +31,10 @@ def one_of(column: str, *values: str) -> CheckConstraint:
     return CheckConstraint(f"{column} IN ({', '.join(repr(v) for v in values)})", name=f"{column}_valid")
 
 
+def level_range() -> CheckConstraint:
+    return CheckConstraint("level BETWEEN 1 AND 5", name="level_range")
+
+
 # ---------- who ----------
 
 class Family(Base):
@@ -42,6 +46,8 @@ class Family(Base):
 
 class Child(Base):
     __tablename__ = "children"
+    __table_args__ = (UniqueConstraint("family_id", "first_name", name="children_family_name_key"),
+                      CheckConstraint("daily_goal > 0 AND weekly_goal > 0", name="goals_positive"))
     id: Mapped[int] = pk()
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
     first_name: Mapped[str] = mapped_column(Text)
@@ -68,9 +74,10 @@ class ChildContest(Base):
 class CustomTopic(Base):
     """Topics a parent added on the Parents page."""
     __tablename__ = "custom_topics"
+    __table_args__ = (UniqueConstraint("family_id", "skill_id", name="custom_topics_family_skill_key"),)
     id: Mapped[int] = pk()
     family_id: Mapped[int] = mapped_column(ForeignKey("families.id", ondelete="CASCADE"), index=True)
-    skill_id: Mapped[str] = mapped_column(Text, unique=True)       # custom.<id>
+    skill_id: Mapped[str] = mapped_column(Text)                    # custom.<id>, unique within a family
     name: Mapped[str] = mapped_column(Text)
     topic: Mapped[str] = mapped_column(Text)
     contests: Mapped[list] = mapped_column(JSONB, server_default="[]")
@@ -87,6 +94,11 @@ class Problem(Base):
         one_of("answer_kind", "choice", "typed"),
         one_of("check_status", "unchecked", "passed", "failed"),
         one_of("status", "draft", "verified", "rejected", "retired"),
+        level_range(),
+        CheckConstraint("answer_kind <> 'choice' OR COALESCE(jsonb_typeof(choices) = 'array' AND answer_index >= 0 "
+                        "AND answer_index < jsonb_array_length(choices), false)", name="choice_has_key"),
+        CheckConstraint("answer_kind <> 'typed' OR COALESCE(jsonb_typeof(accepted_answers) = 'array' "
+                        "AND jsonb_array_length(accepted_answers) > 0, false)", name="typed_has_answers"),
         Index("problems_pick", "skill", "level", "status"),
     )
     id: Mapped[int] = pk()
@@ -144,7 +156,8 @@ class PracticeSession(Base):
     """An untimed set. current_problem_id is what lets him pick up where he left off."""
     __tablename__ = "practice_sessions"
     __table_args__ = (one_of("kind", "placement", "daily", "topic"), one_of("status", "open", "done"),
-                      Index("practice_open", "child_id", "status"))
+                      Index("practice_open", "child_id", "status"),
+                      Index("practice_one_open", "child_id", unique=True, postgresql_where=text("status = 'open'")))
     id: Mapped[int] = pk()
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"))
     kind: Mapped[str] = mapped_column(Text)
@@ -162,7 +175,10 @@ class MockTest(Base):
     """No pause: leaving for more than two minutes (last_seen_at) abandons the test.
     ends_at never moves, so the clock keeps running through the grace period."""
     __tablename__ = "mock_tests"
-    __table_args__ = (one_of("status", "preparing", "in_progress", "finished", "abandoned"),)
+    __table_args__ = (one_of("status", "preparing", "in_progress", "finished", "abandoned"),
+                      CheckConstraint("ends_at IS NULL OR started_at IS NULL OR ends_at > started_at", name="clock_order"),
+                      Index("mock_one_live", "child_id", unique=True,
+                            postgresql_where=text("status IN ('preparing', 'in_progress')")))
     id: Mapped[int] = pk()
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"), index=True)
     contest: Mapped[str] = mapped_column(Text)
@@ -185,6 +201,7 @@ class MockTest(Base):
 class MockTestItem(Base):
     """The paper itself. His answers go in answers."""
     __tablename__ = "mock_test_items"
+    __table_args__ = (UniqueConstraint("mock_test_id", "problem_id", name="mock_items_problem_key"),)
     mock_test_id: Mapped[int] = mapped_column(ForeignKey("mock_tests.id", ondelete="CASCADE"), primary_key=True)
     position: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"))
@@ -197,8 +214,13 @@ class Answer(Base):
     no separate tally to drift. A mock test keeps only the final answer per question."""
     __tablename__ = "answers"
     __table_args__ = (one_of("mode", "placement", "practice", "retry", "mock"),
+                      level_range(),
+                      CheckConstraint("points BETWEEN 0 AND 5", name="points_range"),
+                      CheckConstraint("mock_test_id IS NULL OR mode = 'mock'", name="mock_link"),
                       Index("answers_by_child", "child_id", "answered_at"),
-                      Index("answers_seen", "child_id", "problem_id"))
+                      Index("answers_seen", "child_id", "problem_id"),
+                      Index("answers_one_per_mock_problem", "mock_test_id", "problem_id", unique=True,
+                            postgresql_where=text("mock_test_id IS NOT NULL")))
     id: Mapped[int] = pk()
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"))
     problem_id: Mapped[int] = mapped_column(ForeignKey("problems.id"))
@@ -221,6 +243,7 @@ class Answer(Base):
 
 class SkillProgress(Base):
     __tablename__ = "skill_progress"
+    __table_args__ = (level_range(),)
     child_id: Mapped[int] = mapped_column(ForeignKey("children.id", ondelete="CASCADE"), primary_key=True)
     skill: Mapped[str] = mapped_column(Text, primary_key=True)
     level: Mapped[int] = mapped_column(SmallInteger, server_default="3")
