@@ -1,0 +1,6 @@
+{"v": 1, "contest": "kangaroo", "focus": null, "tier": "quick", "verify": false,
+ "goals": {"day": 8, "week": 40},
+ "placement": {"queue": ["number.fractions"], "i": 1, "done": true},
+ "custom": [{"id": "custom.abc", "name": "Magic squares", "topic": "logic", "contests": ["kangaroo"], "note": "Kid's favorite"}],
+ "skills": {"number.fractions": {"level": 4, "up": 1, "down": 0, "n": 3, "ok": 2, "reasons": {"slip": 1}, "recent": []}},
+ "mocks": [{"at": "2026-10-01T15:00:00Z", "size": "short", "n": 12, "correct": 8, "score": 30, "max": 48, "secs": 1500, "unit": "point"}]}
