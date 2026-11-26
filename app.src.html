@@ -136,7 +136,8 @@ const SK = Object.fromEntries(MAP.skills.map(s => [s.id, s]));
 const TOPICS = MAP.topics.concat([{ id: 'custom', name: 'Added topics' }]);
 const TOPIC = Object.fromEntries(TOPICS.map(t => [t.id, t.name]));
 const MAX_ADDED = 20;
-const CONTESTS = { kangaroo: 'Math Kangaroo', imc: 'International Math Contest', both: 'Both contests' };
+const CONTEST_KEYS = Object.keys(MAP.contests);
+const CONTESTS = Object.assign(Object.fromEntries(CONTEST_KEYS.map(k => [k, MAP.contests[k].short])), { both: 'All of them' });   // 'both' is the saved value for every contest, kept from when there were two
 const REASONS = [
   ['read', "I didn't understand the question"],
   ['start', "I didn't know how to start"],
@@ -405,11 +406,14 @@ function figurePrompt(sk) {
 }
 
 /* ---------- writing and checking problems ---------- */
-function contestNames(sk) { return sk.contests.map(c => MAP.contests[c].name).join(' and '); }
+function contestNames(sk) {           // only the contests this learner is training for
+  const mine = sk.contests.filter(c => MAP.contests[c] && (S.contest === 'both' || c === S.contest));
+  return (mine.length ? mine : sk.contests).map(c => MAP.contests[c].name).join(', ');
+}
 function genPrompt(sk, level, st) {
   const theme = THEMES[Math.floor(Math.random() * THEMES.length)];
   const trouble = Object.entries(st.reasons).sort((a, b) => b[1] - a[1])[0];
-  const kg = S.contest !== 'imc' && sk.contests.includes('kangaroo') ? MAP.contests.kangaroo.style : null;
+  const kg = (S.contest === 'kangaroo' || S.contest === 'both') && sk.contests.includes('kangaroo') ? MAP.contests.kangaroo.style : null;
   const pts = level <= 2 ? 3 : level <= 4 ? 4 : 5;
   return [
     'You write original practice problems for a grade 5-6 student preparing for math contests (' + contestNames(sk) + ').',
@@ -968,7 +972,7 @@ function viewMock() {
     return [h('div', { class: 'sheet' },
       h('h2', null, 'Timed mock test'),
       h('p', null, 'Set up like the real Math Kangaroo paper: questions worth 3, 4 and 5 points, a countdown clock, and no hints or tutor until you finish. Wrong answers do not lose points, so answer every question.'),
-      S.contest === 'imc' ? h('p', { class: 'muted' }, 'This uses the Math Kangaroo layout with your IMC topics, because the IMC paper format has not been set up yet.') : null,
+      S.contest !== 'kangaroo' && S.contest !== 'both' ? h('p', { class: 'muted' }, 'This uses the Math Kangaroo layout with your ' + CONTESTS[S.contest] + ' topics, because that paper\'s format has not been set up yet.') : null,
       h('div', { class: 'row' }, Object.keys(MOCK_SIZES).map(k => h('button', { class: 'btn', type: 'button', onclick: () => prepareMock(k) }, MOCK_SIZES[k].name + ': ' + MOCK_SIZES[k].each * 3 + ' questions, ' + MOCK_SIZES[k].minutes + ' minutes'))),
       h('p', { class: 'muted small' }, 'Every question is written before the clock starts. That takes a few minutes for a short test and a good deal longer for a full one. A full test also uses a lot of Claude usage.'))];
   }
@@ -1035,7 +1039,7 @@ let removing = null;
 function addTopic(ev) {
   ev.preventDefault();
   const name = $('pt-name').value.trim().slice(0, 60), note = $('pt-note').value.trim().slice(0, 400), group = $('pt-group').value;
-  const contests = ['kangaroo', 'imc'].filter(c => $('pt-' + c).checked);
+  const contests = CONTEST_KEYS.filter(c => $('pt-' + c).checked);
   const err = !name ? 'Give the topic a name.'
     : !contests.length ? 'Tick at least one contest.'
     : allSkills().some(s => s.name.toLowerCase() === name.toLowerCase()) ? 'There is already a topic called "' + name + '".'
@@ -1067,8 +1071,7 @@ function viewParents() {
     h('div', { class: 'field' }, h('label', { for: 'pt-group' }, 'Show it under'),
       h('select', { id: 'pt-group' }, TOPICS.map(t => h('option', { value: t.id, selected: t.id === 'custom' }, t.name)))),
     h('fieldset', null, h('legend', null, 'Use it for'),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-kangaroo', checked: true }), CONTESTS.kangaroo),
-      h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-imc', checked: true }), CONTESTS.imc)),
+      CONTEST_KEYS.map(k => h('label', { class: 'check' }, h('input', { type: 'checkbox', id: 'pt-' + k, checked: true }), CONTESTS[k]))),
     h('p', { class: 'err', id: 'pt-error', role: 'alert', hidden: true }),
     h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'submit' }, 'Add topic')));
   const list = h('div', { class: 'sheet' }, h('h3', null, 'Topics you added'),
@@ -1076,7 +1079,7 @@ function viewParents() {
       const st = S.skills[s.id];
       return h('div', { class: 'added' },
         h('div', null, h('strong', null, s.name),
-          h('div', { class: 'muted small' }, TOPIC[s.topic] + ', ' + s.contests.map(c => CONTESTS[c]).join(' and ') + (st && st.n ? ', level ' + st.level + ', ' + st.ok + ' of ' + st.n + ' right' : ', not tried yet')),
+          h('div', { class: 'muted small' }, TOPIC[s.topic] + ', ' + s.contests.map(c => CONTESTS[c]).join(', ') + (st && st.n ? ', level ' + st.level + ', ' + st.ok + ' of ' + st.n + ' right' : ', not tried yet')),
           s.note ? h('div', { class: 'small' }, s.note) : null),
         removing === s.id
           ? h('div', { class: 'row' }, h('span', null, 'Remove it and its progress?'),
