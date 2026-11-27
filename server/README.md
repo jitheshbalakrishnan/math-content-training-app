@@ -1,8 +1,12 @@
 # Local backend
 
-The part of Math Contest Trainer that runs on your Mac: a Postgres database, an API, and
-later the agents that write problems and tutor. The page still runs in Claude and still
-saves there; it is switched over to this API in a later change.
+The part of Math Contest Trainer that runs on your Mac: a Postgres database, an API, and the
+agents that write problems, check answers and tutor, using your own Claude key.
+
+The app can now be opened from this server at http://localhost:8000. Its Claude calls then go
+through the server with the model each agent is set to in `config/agents.toml`. **For now it
+still saves progress in the browser, not in the database**, so keep using the copy in Claude
+for real practice until the next change moves saving to the API.
 
 ## One-time setup
 
@@ -31,9 +35,13 @@ uv run alembic upgrade head          # after every git pull, in case there is a 
 uv run uvicorn app.main:app --port 8000
 ```
 
-Then open http://localhost:8000/docs to see and try every route. Only this Mac can reach it.
-Adding `--host 0.0.0.0` lets other devices at home use it, but there is no sign-in yet, so
-anyone on your home network could.
+Then open http://localhost:8000 for the app, or http://localhost:8000/docs to see and try every route. Only this Mac can reach it.
+
+To use it on a phone or tablet at home: put a long random secret in `.env` as `APP_TOKEN`
+(for example the output of `openssl rand -hex 16`), start the server with `--host 0.0.0.0`, and
+open `http://<this Mac's address>:8000/?token=<APP_TOKEN>` once on that device. The browser
+keeps a cookie, so after that the plain address works. Without the secret, other devices can
+open the page but cannot use the API, so they cannot spend your Claude key or see progress.
 
 Optional settings in `.env`: `APP_TIMEZONE` (default `America/New_York`, used for daily counts
 and streaks) and `CORS_ORIGINS` (comma-separated, for a page served from another address).
@@ -52,6 +60,8 @@ and streaks) and `CORS_ORIGINS` (comma-separated, for a page served from another
 | `GET /api/children/{id}/seen` | Problems he has already had, so none repeats |
 | `POST /api/children/{id}/practice` | Start a practice set, or get the open one back |
 | `POST /api/children/{id}/mocks` … `/start`, `/heartbeat`, `/answers/{n}`, `/finish` | Mock tests: keys hidden until the end, last answer kept, scored when time runs out, abandoned after two minutes away |
+| `GET /` | The app |
+| `POST /api/claude` | One call for the writer, checker or tutor, with the model from `config/agents.toml`. Recorded in `agent_runs` (model, tokens, time, failures), without the text. At most 40 calls a minute |
 
 ## Import progress from the hosted app
 
@@ -74,6 +84,7 @@ It runs in one transaction and does nothing if that child is already there.
 | `app/main.py` | The API routes |
 | `app/service.py` | What each route does |
 | `app/rules/` | Leveling, marking, the mock test clock, days and streaks: plain Python |
+| `app/agents/claude.py` | One Claude call for an agent, with your key |
 | `app/models.py` | The tables, as SQLAlchemy models |
 | `app/points.py` | The reward points rule |
 | `app/config.py` | Settings, and each agent's model from `config/agents.toml` |

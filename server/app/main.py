@@ -2,25 +2,42 @@
 
     uv run uvicorn app.main:app --port 8000
 
-Only this Mac can reach it by default. To use it from another device at home, add
---host 0.0.0.0; there is no sign-in yet, so anyone on the home network could then use it.
+Only this Mac can reach it by default. To use it from another device at home, set APP_TOKEN in
+.env, run with --host 0.0.0.0, and open http://<mac-address>:8000/?token=<APP_TOKEN> once on that
+device (see app/access.py).
 """
+import os
+import time
 from collections.abc import Callable, Iterator
 from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from . import schemas, service
-from .config import CORS_ORIGINS
+from . import access, schemas, service
+from .agents import claude
+from .config import CORS_ORIGINS, ROOT, agents
 from .db import Session as SessionMaker
+from .models import AgentRun
+
+PAGE = ROOT / "math-contest-trainer.html"
+APP_TOKEN = os.environ.get("APP_TOKEN", "").strip()
 
 app = FastAPI(title="Math Contest Trainer", version="0.1.0")
 if CORS_ORIGINS:
     app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def only_allowed_devices(request: Request, call_next):
+    ok, why = access.decide(request.client.host if request.client else None, request.url.path, APP_TOKEN,
+                            request.cookies.get(access.COOKIE), request.headers.get(access.HEADER))
+    if not ok:
+        return JSONResponse(status_code=403, content={"code": "not_allowed", "detail": why})
+    return await call_next(request)
 
 
 def get_db() -> Iterator[Session]:
@@ -59,10 +76,60 @@ def run(fn: Callable, db: Session):
         raise
 
 
+@app.get("/")
+def page(token: str | None = None):
+    """The app itself, built from src/ by build.py. Served here, its Claude calls come to /api/claude.
+    ?token=<APP_TOKEN> lets this browser use the API from another device, then drops it from the address."""
+    if token is not None:
+        if not access.token_ok(APP_TOKEN, token):
+            return PlainTextResponse("That link is not right. Ask a grown-up for the app's link.", status_code=403)
+        r = RedirectResponse("/", status_code=303)
+        r.set_cookie(access.COOKIE, token, max_age=365 * 24 * 3600, httponly=True, samesite="strict")
+        return r
+    return FileResponse(PAGE, media_type="text/html", headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/api/health")
 def health(db: Session = DB):
     db.execute(text("SELECT 1"))
-    return {"ok": True}
+    return {"ok": True, "claude": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())}
+
+
+@app.exception_handler(claude.AgentError)
+def agent_error(_: Request, e: claude.AgentError) -> JSONResponse:
+    return JSONResponse(status_code=e.status, content={"code": e.code, "detail": e.detail})
+
+
+@app.post("/api/claude")
+def ask_claude(body: schemas.ClaudeIn):
+    """Runs in a worker thread (a plain def), so a slow reply does not hold up other requests.
+    Every call is recorded in agent_runs, without its text."""
+    cfg = agents()[body.agent]
+    started = time.monotonic()
+    run_row = {"agent": body.agent, "provider": cfg.get("provider", "anthropic"),
+               "model": claude.pick_model(cfg, body.tier), "child_id": body.child_id}
+    try:
+        reply = claude.call(body.agent, cfg, [t.model_dump() for t in body.messages], body.tier)
+    except claude.AgentError as e:
+        _record(**run_row, ok=False, error=e.code, seconds=round(time.monotonic() - started, 2))
+        raise
+    _record(**run_row, model_used=reply.model, ok=True, tokens_in=reply.tokens_in, tokens_out=reply.tokens_out,
+            seconds=reply.seconds)
+    return {"text": reply.text, "model": reply.model}
+
+
+def _record(model_used: str | None = None, **row) -> None:
+    """Best effort: a logging failure never costs him his problem."""
+    if model_used:
+        row["model"] = model_used
+    try:
+        with SessionMaker() as db:
+            if row.get("child_id") is not None and db.get(service.Child, row["child_id"]) is None:
+                row["child_id"] = None
+            db.add(AgentRun(**row))
+            db.commit()
+    except Exception:
+        pass
 
 
 # ---------- children ----------

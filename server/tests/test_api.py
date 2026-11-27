@@ -16,10 +16,12 @@ class Clock:
 
 
 @pytest.fixture()
-def api(clean):
+def api(clean, monkeypatch):
     from fastapi.testclient import TestClient
 
+    from app import access
     from app.main import app, get_now
+    monkeypatch.setattr(access, "LOOPBACK", access.LOOPBACK | {"testclient"})    # TestClient's made-up host is this Mac
     clock = Clock()
     app.dependency_overrides[get_now] = clock
     with TestClient(app) as client:
@@ -338,3 +340,70 @@ def test_nulls_and_blank_keys_are_refused_politely(api):
     assert api.patch(f"/api/children/{cid}/practice/{s['id']}", json={"status": None}).status_code == 422
     typed = {"skill": "x", "level": 3, "question": "q", "answer_kind": "typed", "accepted_answers": ["  "]}
     assert api.post("/api/problems", json=typed).status_code == 422
+
+
+# ---------- the page and Claude calls ----------
+
+def test_the_page_is_served(api):
+    r = api.get("/")
+    assert r.status_code == 200 and "Math Contest Trainer" in r.text
+
+
+def test_claude_calls_use_the_configured_model_and_are_recorded(api, clean, monkeypatch):
+    from app.agents import claude
+    seen = {}
+
+    def fake(agent, cfg, messages, tier=None, key=None, now=None):
+        seen.update(agent=agent, model=claude.pick_model(cfg, tier), messages=messages)
+        return claude.Reply(text='{"answer":"C"}', model="claude-sonnet-5-5", tokens_in=40, tokens_out=8, seconds=0.5)
+    monkeypatch.setattr(claude, "call", fake)
+    cid = child(api)
+    r = api.post("/api/claude", json={"agent": "checker", "messages": [{"role": "user", "content": "solve"}], "child_id": cid})
+    assert r.json() == {"text": '{"answer":"C"}', "model": "claude-sonnet-5-5"}
+    assert seen["model"] == "claude-sonnet-5-5"                  # from config/agents.toml
+    with clean.connect() as c:
+        row = c.exec_driver_sql("SELECT agent, model, child_id, tokens_in, tokens_out, ok FROM agent_runs").one()
+    assert tuple(row) == ("checker", "claude-sonnet-5-5", cid, 40, 8, True)
+
+
+def test_a_failed_claude_call_says_why_and_is_recorded(api, clean, monkeypatch):
+    from app.agents import claude
+
+    def fail(*a, **k):
+        raise claude.AgentError("no_key", 503, "ANTHROPIC_API_KEY is not set in .env.")
+    monkeypatch.setattr(claude, "call", fail)
+    r = api.post("/api/claude", json={"agent": "writer", "messages": [{"role": "user", "content": "x"}], "child_id": 999})
+    assert r.status_code == 503 and r.json()["code"] == "no_key"
+    with clean.connect() as c:
+        assert tuple(c.exec_driver_sql("SELECT agent, ok, error, child_id FROM agent_runs").one()) == ("writer", False, "no_key", None)
+
+
+def test_only_live_agents_can_be_called(api):
+    r = api.post("/api/claude", json={"agent": "coach", "messages": [{"role": "user", "content": "x"}]})
+    assert r.status_code == 422
+
+
+
+# ---------- other devices ----------
+
+def test_another_device_needs_the_secret_link(api, monkeypatch):
+    from app import access, main
+    monkeypatch.setattr(access, "LOOPBACK", set())                  # as if the request came from a phone
+    monkeypatch.setattr(main, "APP_TOKEN", "s3cret")
+    assert api.get("/").status_code == 200                          # the page itself is fine
+    r = api.post("/api/claude", json={"agent": "tutor", "messages": [{"role": "user", "content": "x"}]})
+    assert r.status_code == 403 and r.json()["code"] == "not_allowed"
+    assert api.get("/api/children").status_code == 403
+    assert api.get("/?token=wrong", follow_redirects=False).status_code == 403
+    r = api.get("/?token=s3cret", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/" and "httponly" in r.headers["set-cookie"].lower()
+    assert api.get("/api/children").status_code == 200              # the cookie is kept by the client
+
+
+def test_without_a_secret_other_devices_cannot_use_the_api(api, monkeypatch):
+    from app import access, main
+    monkeypatch.setattr(access, "LOOPBACK", set())
+    monkeypatch.setattr(main, "APP_TOKEN", "")
+    r = api.get("/api/children")
+    assert r.status_code == 403 and "APP_TOKEN" in r.json()["detail"]
+    assert api.get("/?token=", follow_redirects=False).status_code == 403

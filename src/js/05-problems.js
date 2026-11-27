@@ -94,10 +94,10 @@ const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after th
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
 // The hosted page can only pick a tier, not a named model. 'quick' is the fast, small tier; 'default' is slower and stronger.
 function writerTier() { return S.tier === 'default' ? 'default' : 'quick'; }
-function ask(prompt, outer) {         // one Claude call, stopped by its time limit or by the caller's signal
+function ask(prompt, outer, agent) {  // one Claude call, stopped by its time limit or by the caller's signal
   const ctl = new AbortController(), stop = () => ctl.abort(), timer = setTimeout(stop, CALL_LIMIT_MS);
   if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', stop); }
-  return env.sample.json(prompt, { cache: false, signal: ctl.signal, modelTier: writerTier() }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
+  return env.sample.json(prompt, withAgent({ cache: false, signal: ctl.signal, modelTier: writerTier() }, agent || 'writer')).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
 }
 async function makeProblem(skillId, level, signal) {
   const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [], n = choiceCount();
@@ -111,7 +111,7 @@ async function makeProblem(skillId, level, signal) {
     p.checked = !!S.verify;
     if (!S.verify) return p;             // the second solve is off by the owner's choice (Parents tab); the problem is shown as written
     stage.set(key, draft ? 'recheck' : 'check');
-    try { v = await ask(verifyPrompt(p), signal); }
+    try { v = await ask(verifyPrompt(p), signal, 'checker'); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
     const said = String((v && v.answer) == null ? '' : v.answer).trim();
     const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
@@ -148,6 +148,10 @@ function errCopy(e) {
   if (c === 'rate_limited') return 'Too many requests right now. Wait a minute, then try again.';
   if (c === 'cancelled') return 'That problem took too long to write, so it was stopped. Try again.';
   if (c === 'unverified') return 'Two drafts of this problem could not be used, so neither was shown.';
+  if (c === 'no_key') return 'The Claude key on the home computer is missing or not working. Ask a grown-up to check it.';
+  if (c === 'offline') return "Can't reach the home computer. Check that it is on, then try again.";
+  if (c === 'timeout') return 'Claude took too long to answer. Try again.';
+  if (c === 'not_allowed') return 'This device is not set up for the app yet. Ask a grown-up to open its secret link here once.';
   return "Couldn't write a problem this time. Try again.";
 }
 

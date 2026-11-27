@@ -219,7 +219,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 let S = null;                       // learner state (saved)
 let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
-const env = { ready: false, sample: null, db: null, base: null };
+const env = { ready: false, sample: null, db: null, base: null, local: false };   // local: served by the server on the home computer
 
 function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick', days: {}, goals: { day: 10, week: 50 } }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
@@ -596,10 +596,10 @@ const CALL_LIMIT_MS = 150000;        // give up on a single Claude call after th
 const stage = new Map();             // what each problem in the works is doing, for the waiting screen
 // The hosted page can only pick a tier, not a named model. 'quick' is the fast, small tier; 'default' is slower and stronger.
 function writerTier() { return S.tier === 'default' ? 'default' : 'quick'; }
-function ask(prompt, outer) {         // one Claude call, stopped by its time limit or by the caller's signal
+function ask(prompt, outer, agent) {  // one Claude call, stopped by its time limit or by the caller's signal
   const ctl = new AbortController(), stop = () => ctl.abort(), timer = setTimeout(stop, CALL_LIMIT_MS);
   if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', stop); }
-  return env.sample.json(prompt, { cache: false, signal: ctl.signal, modelTier: writerTier() }).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
+  return env.sample.json(prompt, withAgent({ cache: false, signal: ctl.signal, modelTier: writerTier() }, agent || 'writer')).finally(() => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', stop); });
 }
 async function makeProblem(skillId, level, signal) {
   const sk = SK[skillId], st = skillState(skillId), key = skillId + '@' + level, why = [], n = choiceCount();
@@ -613,7 +613,7 @@ async function makeProblem(skillId, level, signal) {
     p.checked = !!S.verify;
     if (!S.verify) return p;             // the second solve is off by the owner's choice (Parents tab); the problem is shown as written
     stage.set(key, draft ? 'recheck' : 'check');
-    try { v = await ask(verifyPrompt(p), signal); }
+    try { v = await ask(verifyPrompt(p), signal, 'checker'); }
     catch (e) { if (e && e.code === 'invalid_json') { why.push('the checker\'s reply could not be read as data'); continue; } throw e; }
     const said = String((v && v.answer) == null ? '' : v.answer).trim();
     const got = /^none\b/i.test(said) ? -1 : answerIndex(said, p.choices, 'checker');
@@ -650,6 +650,10 @@ function errCopy(e) {
   if (c === 'rate_limited') return 'Too many requests right now. Wait a minute, then try again.';
   if (c === 'cancelled') return 'That problem took too long to write, so it was stopped. Try again.';
   if (c === 'unverified') return 'Two drafts of this problem could not be used, so neither was shown.';
+  if (c === 'no_key') return 'The Claude key on the home computer is missing or not working. Ask a grown-up to check it.';
+  if (c === 'offline') return "Can't reach the home computer. Check that it is on, then try again.";
+  if (c === 'timeout') return 'Claude took too long to answer. Try again.';
+  if (c === 'not_allowed') return 'This device is not set up for the app yet. Ask a grown-up to open its secret link here once.';
   return "Couldn't write a problem this time. Try again.";
 }
 
@@ -802,12 +806,12 @@ async function tutorSend(text, hidden) {
   const timer = setTimeout(() => { late = true; c.ctl.abort(); }, CALL_LIMIT_MS);   // same limit as problem writing
   renderChat();
   try {
-    const r = await env.sample(turns, { cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } });
+    const r = await env.sample(turns, withAgent({ cache: false, modelTier: 'quick', signal: c.ctl.signal, onText: ({ text }) => { reply.content = text; reply.pending = false; if (cur === c) renderChat(); } }, 'tutor'));
     reply.content = r.text;
   } catch (e) {
     reply.content = (e && e.text) || '';
     if (late) reply.error = 'The tutor took too long to answer, so it was stopped. Ask again.';
-    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : "The tutor couldn't answer just now. Ask again.";
+    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : e && ['no_key', 'offline', 'timeout', 'not_allowed'].includes(e.code) ? errCopy(e) : "The tutor couldn't answer just now. Ask again.";
     if (!reply.content && !reply.error) c.chat.splice(c.chat.indexOf(reply), 1);
   }
   clearTimeout(timer);
@@ -1429,6 +1433,46 @@ function viewParents() {
   return [form, list, goal, check];
 }
 
+/* ---------- running from the home computer: Claude calls go to the local server, which holds the key ---------- */
+async function findLocalServer() {   // only when the page is not inside Claude and was served over http by our server
+  if (window.claude || !/^https?:$/.test(location.protocol)) return null;
+  try {
+    const r = await fetch('/api/health', { cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    return j && j.ok ? j : null;
+  } catch (e) { return null; }
+}
+function readJson(text) {            // a reply that should be only JSON, perhaps wrapped in a code fence or a sentence
+  const t = String(text || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  try { return JSON.parse(t); } catch (e) {}
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch (e) {} }
+  return undefined;
+}
+function localSample() {             // the same shape as Claude's page capability: sample(turns, opts) and sample.json(prompt, opts)
+  const post = async (agent, messages, opts) => {
+    let r;
+    try {
+      r = await fetch('/api/claude', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: opts.signal,
+        body: JSON.stringify({ agent, messages, tier: opts.modelTier === 'default' ? 'default' : 'quick' }) });
+    } catch (e) { throw { code: e && e.name === 'AbortError' ? 'cancelled' : 'offline' }; }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw { code: j.code || 'unavailable' };
+    return String(j.text || '');
+  };
+  const sample = async (turns, opts = {}) => {
+    const text = await post(opts.agent || 'tutor', turns, opts);
+    if (opts.onText) opts.onText({ text });
+    return { text };
+  };
+  sample.json = async (prompt, opts = {}) => {
+    const data = readJson(await post(opts.agent || 'writer', [{ role: 'user', content: prompt }], opts));
+    if (data === undefined || data === null || typeof data !== 'object') throw { code: 'invalid_json' };
+    return data;
+  };
+  return sample;
+}
+function withAgent(opts, agent) { return env.local ? Object.assign(opts, { agent }) : opts; }   // Claude's own page does not take this option
 function render() {
   const route = ['practice', 'progress', 'parents', 'mock'].find(r => location.hash === '#' + r) || 'home';
   for (const r of ['home', 'practice', 'mock', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
@@ -1444,6 +1488,7 @@ async function boot() {
   const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
   const [sample, db, user] = await Promise.all([use('sample'), use('db'), use('user')]);
   env.sample = sample;
+  if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; }
   if (db && user) { try { const id = await user.id(); if (id) { env.db = db; env.base = 'data/users/' + id; } } catch (e) {} }
   const saved = await loadState();
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);

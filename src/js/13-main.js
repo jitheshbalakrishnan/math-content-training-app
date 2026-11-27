@@ -13,6 +13,7 @@ async function boot() {
   const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
   const [sample, db, user] = await Promise.all([use('sample'), use('db'), use('user')]);
   env.sample = sample;
+  if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; }
   if (db && user) { try { const id = await user.id(); if (id) { env.db = db; env.base = 'data/users/' + id; } } catch (e) {} }
   const saved = await loadState();
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);
