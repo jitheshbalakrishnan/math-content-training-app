@@ -1,5 +1,5 @@
 /* One light look in every viewer theme, by choice: the page is squared paper. */
-/* Layout: a squared-paper exercise book. One problem per sheet, a red margin rule down the left, a single left-aligned column. */
+/* Layout: an exercise book on a plain background (squares only on the scratchpad, where they help). One problem per sheet, a red margin rule down the left, a single left-aligned column. */
 :root{
   --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
   --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
@@ -10,8 +10,7 @@
 
 *{box-sizing:border-box}
 body{background-color:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
-  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-  background-size:24px 24px;padding-inline:16px;padding-block:20px 48px}
+  padding-inline:16px;padding-block:20px 48px}
 .book{max-width:44rem;margin-inline:auto;display:flex;flex-direction:column;gap:20px}
 .book.wide{max-width:74rem}
 .work{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}

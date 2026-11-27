@@ -1,7 +1,9 @@
 .home{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:20px;align-items:start}
 a.btn{text-decoration:none;display:flex;align-items:center}
-.foot{font-size:.9rem}
-.foot a{color:var(--muted)}
+.parents-link{font-family:var(--display);font-weight:700;color:var(--ink);text-decoration:none;border:2px solid var(--ink);
+  background:var(--sheet);padding:8px 16px;min-height:44px;display:inline-flex;align-items:center}
+.parents-link:hover{background:var(--hl)}
+.parents-link[aria-current="page"]{background:var(--ink);color:var(--sheet)}
 .setline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
 .setline b{font-family:var(--display);font-weight:700}
 .setbar{flex:1 1 12rem;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;max-width:30rem}
