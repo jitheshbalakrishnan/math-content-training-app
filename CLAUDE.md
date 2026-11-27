@@ -1,4 +1,4 @@
-# Puzzle Peak (Math Contest Trainer)
+# PuzzlePeak (Math Contest Trainer)
 
 A practice app for a grade 5-6 student preparing for Math Kangaroo, the International Math Contest (IMC) and the CREST Mathematics Olympiad (CMO). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call can check the answer (a setting, off by default), and the app adapts difficulty per skill.
 
