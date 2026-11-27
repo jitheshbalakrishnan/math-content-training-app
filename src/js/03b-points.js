@@ -30,4 +30,8 @@ function climb(points) {
   const next = CAMPS[at + 1];
   return { mountain, here, camp: CAMPS[at][1], next: next ? next[1] : null, toNext: next ? next[0] - here : 0, share: here / SUMMIT };
 }
+function campShare(points) {         // how far he is from the last camp to the next, 0 to 100
+  const c = climb(points), i = CAMPS.findIndex(x => x[1] === c.camp), from = CAMPS[i][0], to = (CAMPS[i + 1] || [SUMMIT])[0];
+  return to > from ? Math.round(100 * (c.here - from) / (to - from)) : 100;
+}
 function childName() { return (env.childName || S.name || '').trim(); }

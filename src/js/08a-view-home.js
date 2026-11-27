@@ -15,7 +15,7 @@ function viewHome() {
   return [h('div', { class: 'home' },
     h('div', { class: 'stack' },
       h('div', { class: 'sheet' },
-        h('h2', null, childName() ? 'Hi, ' + childName() + '!' : 'Today'),
+        h('h2', null, childName() ? 'Hi, ' + childName() + '! Ready to climb?' : "Today's climb"),
         h('p', null, say),
         h('div', { class: 'setline' }, setBar(done, g.day, done < g.day ? done : -1)),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: go }, label))),
@@ -29,6 +29,7 @@ function viewHome() {
           h('a', { class: 'btn', href: '#progress' }, 'See my progress'))),
       h('a', { class: 'homepts', href: '#score' },
         h('span', { class: 'big' }, S.points || 0), h('span', null, (S.points === 1 ? 'point' : 'points') + (pointsToday() ? ', +' + pointsToday() + ' today' : '')),
-        h('span', { class: 'muted small' }, climb(S.points).camp + (climb(S.points).mountain > 1 ? ' on mountain ' + climb(S.points).mountain : '') + '. See your climb')),
+        h('span', { class: 'small' }, climb(S.points).camp + (climb(S.points).mountain > 1 ? ' on mountain ' + climb(S.points).mountain : '') + (climb(S.points).next ? ': ' + climb(S.points).toNext + ' to ' + climb(S.points).next : '')),
+        h('span', { class: 'campbar', role: 'img', 'aria-label': 'Progress to the next camp' }, h('i', { style: 'width:' + campShare(S.points) + '%' }))),
       h('p', { class: 'muted' }, 'This week: ' + week + ' of ' + g.week + ' problems')))];
 }
