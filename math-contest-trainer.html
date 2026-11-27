@@ -2,7 +2,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@500;700;800&display=swap">
 <style>
 /* One light look in every viewer theme, by choice: the page is squared paper. */
-/* Layout: a squared-paper exercise book. One problem per sheet, a red margin rule down the left, a single left-aligned column. */
+/* Layout: an exercise book on a plain background (squares only on the scratchpad, where they help). One problem per sheet, a red margin rule down the left, a single left-aligned column. */
 :root{
   --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
   --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
@@ -13,8 +13,7 @@
 
 *{box-sizing:border-box}
 body{background-color:var(--paper);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
-  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-  background-size:24px 24px;padding-inline:16px;padding-block:20px 48px}
+  padding-inline:16px;padding-block:20px 48px}
 .book{max-width:44rem;margin-inline:auto;display:flex;flex-direction:column;gap:20px}
 .book.wide{max-width:74rem}
 .work{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
@@ -129,8 +128,10 @@ legend{padding:0;margin-bottom:4px}
 .prog-row .n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:.9rem;min-width:5.5em;text-align:right}
 .home{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:20px;align-items:start}
 a.btn{text-decoration:none;display:flex;align-items:center}
-.foot{font-size:.9rem}
-.foot a{color:var(--muted)}
+.parents-link{font-family:var(--display);font-weight:700;color:var(--ink);text-decoration:none;border:2px solid var(--ink);
+  background:var(--sheet);padding:8px 16px;min-height:44px;display:inline-flex;align-items:center}
+.parents-link:hover{background:var(--hl)}
+.parents-link[aria-current="page"]{background:var(--ink);color:var(--sheet)}
 .setline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px}
 .setline b{font-family:var(--display);font-weight:700}
 .setbar{flex:1 1 12rem;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;max-width:30rem}
@@ -171,10 +172,10 @@ a.btn{text-decoration:none;display:flex;align-items:center}
       <a href="#mock" id="tab-mock">Mock test</a>
       <a href="#progress" id="tab-progress">Progress</a>
     </nav>
+    <a href="#parents" id="tab-parents" class="parents-link">For parents</a>
   </header>
   <p id="notice" class="notice" hidden></p>
   <main id="view" class="stack"></main>
-  <p class="foot"><a href="#parents" id="tab-parents">For parents</a></p>
 </div>
 
 <script>
