@@ -159,6 +159,26 @@ def skill_level(child_id: int, skill: str, body: schemas.SkillLevelIn, db: Sessi
     return run(lambda: service.set_skill_level(db, child_id, skill, body.level), db)
 
 
+@app.get("/api/children/{child_id}/days")
+def days(child_id: int, db: Session = DB, now: datetime = NOW):
+    return service.child_days(db, child_id, now)
+
+
+@app.get("/api/children/{child_id}/topics")
+def topics(child_id: int, db: Session = DB):
+    return service.list_topics(db, child_id)
+
+
+@app.post("/api/children/{child_id}/topics", status_code=201)
+def add_topic(child_id: int, body: schemas.TopicIn, db: Session = DB):
+    return run(lambda: service.add_topic(db, child_id, body), db)
+
+
+@app.delete("/api/children/{child_id}/topics/{skill_id}")
+def remove_topic(child_id: int, skill_id: str, db: Session = DB):
+    return run(lambda: service.remove_topic(db, child_id, skill_id), db)
+
+
 @app.get("/api/children/{child_id}/seen")
 def seen(child_id: int, skill: str | None = None, db: Session = DB):
     return service.seen_problem_ids(db, child_id, skill)

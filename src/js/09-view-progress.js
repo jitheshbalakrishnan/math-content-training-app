@@ -46,7 +46,7 @@ function viewProgressBody() {
   const reset = h('div', { class: 'row' }, confirmReset
     ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
     : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
-  const some = (S.mocks && S.mocks.length) || Object.keys(S.days || {}).length;      // anything a reset would clear
+  const some = !(env.local && LOCAL.child) && ((S.mocks && S.mocks.length) || Object.keys(S.days || {}).length);   // anything a reset would clear; on the home computer the database keeps his history
   if (!n) return [logTiles(), h('div', { class: 'sheet' }, h('h2', null, 'No skills to show yet'),
     h('p', { class: 'muted' }, 'Answer a few problems and each skill appears here with its level and how many you got right.'),
     h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set'))), ...(some ? [reset] : [])];
@@ -68,6 +68,6 @@ function viewProgressBody() {
         st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'),
         h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
-  return [logTiles(), head, ...groups, reset];
+  return [logTiles(), head, ...groups, env.local && LOCAL.child ? h('p', { class: 'muted small' }, 'Progress is kept on the home computer.') : reset];
 }
 

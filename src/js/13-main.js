@@ -15,7 +15,12 @@ async function boot() {
   env.sample = sample;
   if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; env.childName = await localChildName(); }
   if (db && user) { try { const id = await user.id(); if (id) { env.db = db; env.base = 'data/users/' + id; } } catch (e) {} }
-  const saved = await loadState();
+  let saved = null;
+  if (env.local) {
+    try { saved = await loadLocalState(); } catch (e) { saved = null; }
+    if (!saved) { LOCAL.child = null; showNotice('No child is set up in the database yet, so progress is kept in this browser.'); }
+  }
+  if (!saved) saved = await loadState();
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);
   if (!Array.isArray(S.custom)) S.custom = [];
   syncCustom();

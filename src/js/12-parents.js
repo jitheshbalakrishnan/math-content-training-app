@@ -9,11 +9,14 @@ function addTopic(ev) {
     : allSkills().some(s => s.name.toLowerCase() === name.toLowerCase()) ? 'There is already a topic called "' + name + '".'
     : (S.custom || []).length >= MAX_ADDED ? 'You can add up to ' + MAX_ADDED + ' topics. Remove one first.' : '';
   if (err) { const e = $('pt-error'); e.textContent = err; e.hidden = false; return; }
-  S.custom = (S.custom || []).concat({ id: 'custom.' + Date.now().toString(36), name, topic: TOPIC[group] ? group : 'custom', contests, prerequisites: [], note });
+  const topic = { id: 'custom.' + Date.now().toString(36), name, topic: TOPIC[group] ? group : 'custom', contests, prerequisites: [], note };
+  S.custom = (S.custom || []).concat(topic);
+  if (env.local && LOCAL.child) api('POST', '/api/children/' + LOCAL.child + '/topics', { skill_id: topic.id, name, topic: topic.topic, contests, note: note || null }).catch(localNotice);
   syncCustom(); saveState(); render();
 }
 function removeTopic(id) {
   S.custom = (S.custom || []).filter(s => s.id !== id);
+  if (env.local && LOCAL.child) api('DELETE', '/api/children/' + LOCAL.child + '/topics/' + encodeURIComponent(id)).catch(localNotice);
   delete S.skills[id];
   const q = S.placement.queue, at = q.indexOf(id);
   if (at >= 0) { q.splice(at, 1); if (at < S.placement.i) S.placement.i--; if (S.contest && S.placement.i >= q.length) S.placement.done = true; }
