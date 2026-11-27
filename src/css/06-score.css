@@ -1,0 +1,14 @@
+/* Points: after an answer, on Home, and the Score page. */
+.pts{font-family:var(--display);font-weight:800;font-size:1.25rem;color:var(--ink);background:var(--hl);align-self:flex-start;padding:4px 12px;transform-origin:left center}
+.homepts{display:flex;flex-direction:column;gap:2px;background:var(--sheet);border:2px solid var(--ink);padding:14px 18px;color:var(--ink);text-decoration:none}
+.homepts:hover{background:var(--hl)}
+.homepts .big{font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.climb,.weekpts{margin:0;display:flex;flex-direction:column;gap:8px}
+.climb svg,.weekpts svg{display:block;width:100%;height:auto;font-family:var(--body)}
+.climb figcaption{font-size:1.05rem}
+.tbars{display:flex;flex-direction:column;gap:10px}
+.tbar{display:grid;grid-template-columns:minmax(7rem,12rem) minmax(0,1fr) 3rem;gap:10px;align-items:center}
+.tbar .track{height:14px;background:var(--paper);display:block}
+.tbar .track i{display:block;height:100%;background:var(--ink);border-radius:0 4px 4px 0}
+.tbar b{font-variant-numeric:tabular-nums;text-align:right}
+@media (max-width:480px){ .tbar{grid-template-columns:minmax(0,1fr) 2.5rem} .tbar .track{grid-column:1 / -1;grid-row:2} }

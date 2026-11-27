@@ -70,6 +70,7 @@ function check() {
   tally(1, c.correct ? 1 : 0);
   c.fresh = true;
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
+  c.pts = 0; repoint(c);
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
@@ -79,14 +80,14 @@ function checkRetry() {              // another go at a missed question; stats a
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
   c.fresh = true;
-  if (c.pick2 === c.p.answer) c.fixed = true;
+  if (c.pick2 === c.p.answer) { c.fixed = true; repoint(c); saveState(); }
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;
   if (c.log) c.log.then(ref => ref && ref.update({ retries: (c.missed || []).length + (c.fixed ? 1 : 0), fixed: !!c.fixed })).catch(() => {});
   render();
 }
 function setFeedback(patch) {
-  const c = cur; Object.assign(c, patch); settle();
+  const c = cur; Object.assign(c, patch); repoint(c); settle();
   if (c.log) c.log.then(ref => ref && ref.update({ reason: c.reason, note: c.note })).catch(() => {});
   render();
 }

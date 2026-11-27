@@ -33,7 +33,7 @@ function viewProgressBody() {
   const all = list.map(s => S.skills[s.id]).filter(Boolean);
   const n = all.reduce((a, s) => a + s.n, 0), ok = all.reduce((a, s) => a + s.ok, 0);
   const erase = () => {               // progress goes; what a parent set up stays
-    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
+    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify, name: S.name || '' };
     confirmReset = false;
     S = Object.assign(newState(), keep);
     syncCustom();

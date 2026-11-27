@@ -1,4 +1,4 @@
-<title>Math Contest Trainer</title>
+<title>Puzzle Peak</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Gabarito:wght@500;700;800&display=swap">
 <style>
 /* One light look in every viewer theme, by choice: the page is squared paper. */
@@ -161,15 +161,30 @@ a.btn{text-decoration:none;display:flex;align-items:center}
 @keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
 .cheer{background:var(--hl);color:var(--on-hl);padding:10px 14px;font-family:var(--display);font-weight:700;font-size:1.1rem;transform-origin:left center}
 @media (prefers-reduced-motion:reduce){ .burst{display:none} .pop,.shake{animation:none} }
+/* Points: after an answer, on Home, and the Score page. */
+.pts{font-family:var(--display);font-weight:800;font-size:1.25rem;color:var(--ink);background:var(--hl);align-self:flex-start;padding:4px 12px;transform-origin:left center}
+.homepts{display:flex;flex-direction:column;gap:2px;background:var(--sheet);border:2px solid var(--ink);padding:14px 18px;color:var(--ink);text-decoration:none}
+.homepts:hover{background:var(--hl)}
+.homepts .big{font-family:var(--display);font-weight:800;font-size:2.2rem;line-height:1;font-variant-numeric:tabular-nums}
+.climb,.weekpts{margin:0;display:flex;flex-direction:column;gap:8px}
+.climb svg,.weekpts svg{display:block;width:100%;height:auto;font-family:var(--body)}
+.climb figcaption{font-size:1.05rem}
+.tbars{display:flex;flex-direction:column;gap:10px}
+.tbar{display:grid;grid-template-columns:minmax(7rem,12rem) minmax(0,1fr) 3rem;gap:10px;align-items:center}
+.tbar .track{height:14px;background:var(--paper);display:block}
+.tbar .track i{display:block;height:100%;background:var(--ink);border-radius:0 4px 4px 0}
+.tbar b{font-variant-numeric:tabular-nums;text-align:right}
+@media (max-width:480px){ .tbar{grid-template-columns:minmax(0,1fr) 2.5rem} .tbar .track{grid-column:1 / -1;grid-row:2} }
 </style>
 
 <div class="book">
   <header class="top">
-    <h1>Math Contest Trainer</h1>
+    <h1>Puzzle Peak</h1>
     <nav aria-label="Sections">
       <a href="#home" id="tab-home">Home</a>
       <a href="#practice" id="tab-practice">Practice</a>
       <a href="#mock" id="tab-mock">Mock test</a>
+      <a href="#score" id="tab-score">Score</a>
       <a href="#progress" id="tab-progress">Progress</a>
     </nav>
     <a href="#parents" id="tab-parents" class="parents-link">For parents</a>
@@ -220,9 +235,9 @@ const clone = o => JSON.parse(JSON.stringify(o));
 let S = null;                       // learner state (saved)
 let cur = null;                     // the problem on screen (not saved)
 let placedNote = false;
-const env = { ready: false, sample: null, db: null, base: null, local: false };   // local: served by the server on the home computer
+const env = { ready: false, sample: null, db: null, base: null, local: false, childName: '' };   // childName: from the database, when served locally   // local: served by the server on the home computer
 
-function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick', days: {}, goals: { day: 10, week: 50 } }; }
+function newState() { return { v: 1, contest: null, placement: { queue: [], i: 0, done: false }, skills: {}, planned: null, retry: null, last: null, custom: [], focus: null, verify: false, mocks: [], tier: 'quick', days: {}, goals: { day: 10, week: 50 }, name: '', points: 0, topicPts: {} }; }
 function skillState(id) { return S.skills[id] || (S.skills[id] = { level: 3, up: 0, down: 0, n: 0, ok: 0, reasons: {}, recent: [] }); }
 function allSkills() { return MAP.skills.concat(S.custom || []); }
 function syncCustom() {              // keep the lookup table in step with the topics a parent added
@@ -338,6 +353,39 @@ function setBar(done, total, now) {  // one square per problem: filled when done
   return h('span', { class: 'setbar', role: 'img', 'aria-label': Math.min(done, total) + ' of ' + total + ' done' },
     Array.from({ length: total }, (_, i) => h('i', { class: i < done ? 'on' : i === now ? 'now' : '' })));
 }
+/* ---------- points: a reward that never changes levels; right first time earns the level, a fixed retry earns 1 ---------- */
+function pointsFor(level, correct, guessed, fixed) {
+  if (correct && !guessed) return Math.max(1, Math.min(5, level || 1));
+  return fixed ? 1 : 0;
+}
+function award(delta, topic) {       // add (or take back) points, for the total, today and the topic
+  if (!delta) return;
+  S.points = Math.max(0, (S.points || 0) + delta);
+  if (!S.days || typeof S.days !== 'object' || Array.isArray(S.days)) S.days = {};
+  const day = S.days[dayKey()] || (S.days[dayKey()] = { n: 0, ok: 0 });
+  day.pts = Math.max(0, (day.pts || 0) + delta);
+  if (!S.topicPts || typeof S.topicPts !== 'object') S.topicPts = {};
+  const t = topic || 'custom';
+  S.topicPts[t] = Math.max(0, (S.topicPts[t] || 0) + delta);
+}
+function repoint(c) {                // bring this problem's points in line with what we now know (a guess, a fixed retry)
+  const want = pointsFor(c.target.level, c.correct, c.reason === 'guess', !!c.fixed);
+  award(want - (c.pts || 0), SK[c.target.skill] && SK[c.target.skill].topic);
+  c.pts = want;
+}
+function pointsToday() { const d = S.days && S.days[dayKey()]; return (d && d.pts) || 0; }
+
+/* The climb: points take him up a mountain, camp by camp. After the summit a new, taller climb starts. */
+const CAMPS = [[0, 'Base camp'], [50, 'Camp 1'], [150, 'Camp 2'], [300, 'Camp 3'], [500, 'High camp'], [800, 'Summit']];
+const SUMMIT = CAMPS[CAMPS.length - 1][0];
+function climb(points) {
+  const p = Math.max(0, points || 0), mountain = Math.floor(p / SUMMIT) + 1, here = p % SUMMIT;
+  let at = 0;
+  for (let i = 0; i < CAMPS.length; i++) if (here >= CAMPS[i][0]) at = i;
+  const next = CAMPS[at + 1];
+  return { mountain, here, camp: CAMPS[at][1], next: next ? next[1] : null, toNext: next ? next[0] - here : 0, share: here / SUMMIT };
+}
+function childName() { return (env.childName || S.name || '').trim(); }
 /* ---------- figures: drawn by code from data the generator supplies, so what he sees is what was checked ---------- */
 const NS = 'http://www.w3.org/2000/svg';
 function sv(tag, attrs, ...kids) {
@@ -730,6 +778,7 @@ function check() {
   tally(1, c.correct ? 1 : 0);
   c.fresh = true;
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
+  c.pts = 0; repoint(c);
   settle();
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
@@ -739,14 +788,14 @@ function checkRetry() {              // another go at a missed question; stats a
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
   c.fresh = true;
-  if (c.pick2 === c.p.answer) c.fixed = true;
+  if (c.pick2 === c.p.answer) { c.fixed = true; repoint(c); saveState(); }
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;
   if (c.log) c.log.then(ref => ref && ref.update({ retries: (c.missed || []).length + (c.fixed ? 1 : 0), fixed: !!c.fixed })).catch(() => {});
   render();
 }
 function setFeedback(patch) {
-  const c = cur; Object.assign(c, patch); settle();
+  const c = cur; Object.assign(c, patch); repoint(c); settle();
   if (c.log) c.log.then(ref => ref && ref.update({ reason: c.reason, note: c.note })).catch(() => {});
   render();
 }
@@ -972,6 +1021,7 @@ function viewPracticeBody() {
       out.push(chatBlock(c));
       return [h('div', { class: 'sheet' }, out)];
     }
+    if (c.pts) out.push(h('p', { class: 'pts' + (fresh ? ' pop' : '') }, '+' + c.pts + (c.pts === 1 ? ' point' : ' points')));
     if (moved && t.mode !== 'placement') out.push(h('p', { class: moved > 0 ? 'cheer' + (fresh ? ' pop' : '') : '' }, moved > 0 ? 'Level up. ' + SK[t.skill].name + ' is now level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
     if (c.setDone) out.push(h('p', { class: 'cheer' + (fresh ? ' pop' : '') }, "Today's set is done. Nice work."));
     if (c.correct) {
@@ -1012,7 +1062,7 @@ function viewHome() {
   return [h('div', { class: 'home' },
     h('div', { class: 'stack' },
       h('div', { class: 'sheet' },
-        h('h2', null, 'Today'),
+        h('h2', null, childName() ? 'Hi, ' + childName() + '!' : 'Today'),
         h('p', null, say),
         h('div', { class: 'setline' }, setBar(done, g.day, done < g.day ? done : -1)),
         h('div', { class: 'row' }, h('button', { class: 'btn primary', type: 'button', onclick: go }, label))),
@@ -1024,6 +1074,9 @@ function viewHome() {
           h('a', { class: 'btn', href: '#practice' }, 'Practice one topic'),
           h('a', { class: 'btn', href: '#mock' }, 'Take a timed mock test'),
           h('a', { class: 'btn', href: '#progress' }, 'See my progress'))),
+      h('a', { class: 'homepts', href: '#score' },
+        h('span', { class: 'big' }, S.points || 0), h('span', null, (S.points === 1 ? 'point' : 'points') + (pointsToday() ? ', +' + pointsToday() + ' today' : '')),
+        h('span', { class: 'muted small' }, climb(S.points).camp + (climb(S.points).mountain > 1 ? ' on mountain ' + climb(S.points).mountain : '') + '. See your climb')),
       h('p', { class: 'muted' }, 'This week: ' + week + ' of ' + g.week + ' problems')))];
 }
 /* ---------- progress: a training log of what he has done and where each skill stands ---------- */
@@ -1061,7 +1114,7 @@ function viewProgressBody() {
   const all = list.map(s => S.skills[s.id]).filter(Boolean);
   const n = all.reduce((a, s) => a + s.n, 0), ok = all.reduce((a, s) => a + s.ok, 0);
   const erase = () => {               // progress goes; what a parent set up stays
-    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify };
+    const keep = { custom: S.custom || [], goals: goals(), tier: S.tier, verify: !!S.verify, name: S.name || '' };
     confirmReset = false;
     S = Object.assign(newState(), keep);
     syncCustom();
@@ -1099,6 +1152,72 @@ function viewProgressBody() {
   return [logTiles(), head, ...groups, reset];
 }
 
+/* ---------- score: his points as a climb up Puzzle Peak, this week's points and points by topic ---------- */
+function mountainSvg(c) {            // a mountain with a zig-zag trail; a flag at each camp; him between camps by points
+  const W = 600, H = 280, base = 250, peak = [300, 30];
+  const trail = [[120, 248], [470, 205], [160, 160], [395, 115], [255, 72], [300, 36]];   // one bend per camp, inside the slopes
+  let seg = 0;
+  for (let i = 0; i < CAMPS.length - 1; i++) if (c.here >= CAMPS[i][0]) seg = i;
+  const f = (c.here - CAMPS[seg][0]) / (CAMPS[seg + 1][0] - CAMPS[seg][0]);
+  const me = [trail[seg][0] + (trail[seg + 1][0] - trail[seg][0]) * f, trail[seg][1] + (trail[seg + 1][1] - trail[seg][1]) * f];
+  const pts = a => a.map(p => p.join(',')).join(' ');
+  return h('figure', { class: 'climb' },
+    sv('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Mountain ' + c.mountain + ': at ' + c.camp + (c.next ? ', ' + c.toNext + ' points to ' + c.next : '') },
+      sv('polygon', { points: `0,${base} ${peak.join(',')} 600,${base}`, fill: 'var(--grid)' }),
+      sv('polygon', { points: `243,72 ${peak.join(',')} 357,72 332,64 314,77 292,63 268,77`, fill: 'var(--sheet)' }),      // snow cap
+      sv('line', { x1: 0, y1: base, x2: W, y2: base, stroke: 'var(--line)', 'stroke-width': 2 }),
+      sv('polyline', { points: pts(trail), fill: 'none', stroke: 'var(--shade)', 'stroke-width': 3, 'stroke-dasharray': '2 7', 'stroke-linecap': 'round' }),
+      sv('polyline', { points: pts(trail.slice(0, seg + 1).concat([me])), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+      CAMPS.map(([need, name], i) => {
+        const [x, y] = trail[i], reached = c.here >= need, left = x < 300;
+        return sv('g', null,
+          sv('line', { x1: x, y1: y, x2: x, y2: y - 20, stroke: 'var(--ink)', 'stroke-width': 2 }),
+          sv('polygon', { points: `${x},${y - 20} ${x + 14},${y - 15} ${x},${y - 10}`, fill: reached ? 'var(--margin)' : 'var(--sheet)', stroke: 'var(--ink)', 'stroke-width': 1.5 }),
+          sv('text', { x: left ? x - 8 : x + 20, y: y - 9, 'text-anchor': left ? 'end' : 'start', 'font-size': 14, 'font-weight': reached ? 700 : 400, fill: reached ? 'var(--ink)' : 'var(--muted)' }, name + (need ? ' · ' + need : '')));
+      }),
+      sv('circle', { cx: me[0], cy: me[1], r: 10, fill: 'var(--hl)', stroke: 'var(--ink)', 'stroke-width': 3 })),
+    h('figcaption', null, c.next ? h('span', null, h('b', null, c.toNext), ' more ' + (c.toNext === 1 ? 'point' : 'points') + ' to ' + c.next + '.') : 'You reached the summit!'));
+}
+function weekBars(days) {            // points each day this week; today is highlighted, the others share one color
+  const W = 420, H = 170, top = 18, base = 140, max = Math.max(10, ...days.map(d => d.pts));
+  const slot = W / 7, bw = Math.min(34, slot - 14);
+  return h('figure', { class: 'weekpts' },
+    sv('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Points this week: ' + days.map(d => d.letter + ' ' + d.pts).join(', ') },
+      sv('line', { x1: 0, y1: base, x2: W, y2: base, stroke: 'var(--line)', 'stroke-width': 1 }),
+      days.map((d, i) => {
+        const hgt = d.pts ? Math.max(4, (base - top) * d.pts / max) : 0, x = i * slot + (slot - bw) / 2, y = base - hgt, r = Math.min(4, hgt);
+        return sv('g', null,
+          sv('title', null, d.letter + ': ' + d.pts + (d.pts === 1 ? ' point' : ' points')),
+          sv('rect', { x: i * slot, y: top, width: slot, height: base - top, fill: 'transparent' }),           // a bigger target for hovering
+          hgt ? sv('path', { d: `M${x},${base} V${y + r} Q${x},${y} ${x + r},${y} H${x + bw - r} Q${x + bw},${y} ${x + bw},${y + r} V${base} Z`, fill: d.today ? 'var(--hl)' : 'var(--ink)', stroke: d.today ? 'var(--ink)' : 'none', 'stroke-width': 2 }) : null,
+          d.today || d.pts === max ? sv('text', { x: x + bw / 2, y: y - 6, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': 700, fill: 'var(--ink)' }, d.pts) : null,
+          sv('text', { x: x + bw / 2, y: base + 20, 'text-anchor': 'middle', 'font-size': 13, 'font-weight': d.today ? 700 : 400, fill: d.today ? 'var(--ink)' : 'var(--muted)' }, d.letter));
+      })));
+}
+function viewScore() {
+  if (!env.ready) return [h('div', { class: 'sheet' }, busyLine('Loading your score'))];
+  const c = climb(S.points), name = childName(), run = streak();
+  const days = thisWeek().map(d => ({ ...d, pts: (S.days && S.days[d.key] && S.days[d.key].pts) || 0 }));
+  const week = days.reduce((a, d) => a + d.pts, 0);
+  const topics = TOPICS.map(t => ({ name: t.name, pts: (S.topicPts && S.topicPts[t.id]) || 0 })).filter(t => t.pts > 0).sort((a, b) => b.pts - a.pts);
+  const most = topics.length ? topics[0].pts : 1;
+  return [
+    h('div', { class: 'tiles' },
+      h('div', { class: 'tile dark' }, h('span', { class: 'muted' }, name ? name + "'s points" : 'Your points'), h('span', { class: 'big' }, S.points || 0),
+        h('span', { class: 'small' }, c.mountain > 1 ? 'Mountain ' + c.mountain : 'Puzzle Peak')),
+      h('div', { class: 'tile' }, h('span', { class: 'muted' }, 'Today'), h('span', { class: 'big' }, '+' + pointsToday()), h('span', { class: 'small' }, week + ' this week')),
+      h('div', { class: 'tile' }, h('span', { class: 'muted' }, 'Days in a row'), h('span', { class: 'big' }, run), h('span', { class: 'small' }, run ? 'Keep it going tomorrow' : 'Practice today to start'))),
+    h('div', { class: 'sheet' }, h('h2', null, c.camp), mountainSvg(c)),
+    h('div', { class: 'sheet' }, h('h3', null, 'Points this week'), weekBars(days)),
+    h('div', { class: 'sheet' }, h('h3', null, 'Points by topic'),
+      topics.length ? h('div', { class: 'tbars' }, topics.map(t => h('div', { class: 'tbar' },
+        h('span', null, t.name), h('span', { class: 'track' }, h('i', { style: 'width:' + Math.max(3, Math.round(100 * t.pts / most)) + '%' })), h('b', null, t.pts))))
+        : h('p', { class: 'muted' }, 'Answer a few problems and your points show up here, topic by topic.')),
+    h('div', { class: 'sheet' }, h('h3', null, 'How points work'),
+      h('p', null, 'Right first time: the problem\'s level in points, so a level 4 problem is worth 4. Right on a second try: 1 point. A guess earns no points, even when it is right.'),
+      h('p', { class: 'muted small' }, 'Points never change your levels. Mock test questions earn points the same way.')),
+  ];
+}
 /* ---------- scratchpad: squared paper beside the problem, for working things out by hand ---------- */
 const pad = (() => {
   const canvas = h('canvas', { role: 'img', 'aria-label': 'Scratchpad for working out the answer. Draw with a finger, pen or mouse.' }), ctx = canvas.getContext('2d');
@@ -1266,6 +1385,7 @@ function finishMock() {
   const r = mockScore(m), at = new Date().toISOString();
   S.mocks = (S.mocks || []).concat({ at, size: m.size, n: m.items.length, correct: r.correct, score: r.score, max: r.max, secs: m.usedSecs, unit: m.unit || 'point' }).slice(-20);
   tally(m.answers.filter(a => a != null).length, r.correct);     // test questions he answered count toward the day and the week
+  m.items.forEach((it, i) => { if (m.answers[i] === it.p.answer) award(pointsFor(it.level, true), SK[it.skill] && SK[it.skill].topic); });
   saveState(); saveMock();          // skill levels are left alone: a test measures, practice teaches
   m.items.forEach((it, i) => logAttempt({ at, skill: it.skill, level: it.level, mode: 'mock', question: it.p.question, figure: it.p.figure || null, choices: it.p.choices, answer: it.p.answer, picked: m.answers[i], correct: m.answers[i] === it.p.answer, ms: null, hints: 0, reason: null, note: '' }));
   render();
@@ -1431,7 +1551,13 @@ function viewParents() {
       h('div', { class: 'field' }, h('label', { for: 'pt-day' }, 'Problems a day'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-day', value: goals().day, onchange: setGoal('day', 3, 30) })),
       h('div', { class: 'field' }, h('label', { for: 'pt-week' }, 'Problems a week'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-week', value: goals().week, onchange: setGoal('week', 10, 200) }))),
     h('p', { class: 'muted small' }, 'The daily goal is the size of "today\'s set" on his Home screen. Reaching it does not stop him practicing. Daily goal 3 to 30, weekly goal 10 to 200.'));
-  return [form, list, goal, check];
+  const who = h('div', { class: 'sheet' }, h('h3', null, "Child's name"),
+    env.childName
+      ? h('p', null, env.childName, h('span', { class: 'muted' }, ' (from the database on the home computer)'))
+      : h('div', { class: 'field' }, h('label', { for: 'pt-child' }, 'First name, shown on his Home and Score pages'),
+          h('input', { type: 'text', id: 'pt-child', maxlength: 30, autocomplete: 'off', value: S.name || '',
+            onchange: ev => { S.name = ev.target.value.trim().slice(0, 30); saveState(); render(); } })));
+  return [who, form, list, goal, check];
 }
 
 /* ---------- running from the home computer: Claude calls go to the local server, which holds the key ---------- */
@@ -1473,11 +1599,15 @@ function localSample() {             // the same shape as Claude's page capabili
   };
   return sample;
 }
+async function localChildName() {    // the child's first name from the database (the first child, until there is a picker)
+  try { const r = await fetch('/api/children', { cache: 'no-store' }); const list = r.ok ? await r.json() : []; return (list[0] && list[0].first_name) || ''; }
+  catch (e) { return ''; }
+}
 function withAgent(opts, agent) { return env.local ? Object.assign(opts, { agent }) : opts; }   // Claude's own page does not take this option
 function render() {
-  const route = ['practice', 'progress', 'parents', 'mock'].find(r => location.hash === '#' + r) || 'home';
-  for (const r of ['home', 'practice', 'mock', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
-  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : route === 'mock' ? viewMock() : route === 'home' ? viewHome() : viewPractice()));
+  const route = ['practice', 'progress', 'parents', 'mock', 'score'].find(r => location.hash === '#' + r) || 'home';
+  for (const r of ['home', 'practice', 'mock', 'score', 'progress', 'parents']) { const a = $('tab-' + r); if (r === route) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  $('view').replaceChildren(...(route === 'progress' ? viewProgress() : route === 'parents' ? viewParents() : route === 'mock' ? viewMock() : route === 'score' ? viewScore() : route === 'home' ? viewHome() : viewPractice()));
   document.querySelector('.book').classList.toggle('wide', !!$('view').querySelector('.work'));     // room for the scratchpad beside the problem
   if (route === 'practice' && cur && cur.p) { if (cur.chatOpen) renderChat(); if (cur.target.mode !== 'placement' && placedNote && cur.checked) placedNote = false; }
 }
@@ -1489,7 +1619,7 @@ async function boot() {
   const use = n => (window.claude && window.claude.use) ? window.claude.use(n).catch(() => null) : Promise.resolve(null);
   const [sample, db, user] = await Promise.all([use('sample'), use('db'), use('user')]);
   env.sample = sample;
-  if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; }
+  if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; env.childName = await localChildName(); }
   if (db && user) { try { const id = await user.id(); if (id) { env.db = db; env.base = 'data/users/' + id; } } catch (e) {} }
   const saved = await loadState();
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);
@@ -1498,6 +1628,9 @@ async function boot() {
   if (!Array.isArray(S.mocks)) S.mocks = [];
   if (!S.days || typeof S.days !== 'object' || Array.isArray(S.days)) S.days = {};
   if (!S.goals || typeof S.goals !== 'object') S.goals = { day: 10, week: 50 };
+  if (typeof S.points !== 'number' || !(S.points >= 0)) S.points = 0;
+  if (!S.topicPts || typeof S.topicPts !== 'object' || Array.isArray(S.topicPts)) S.topicPts = {};
+  if (typeof S.name !== 'string') S.name = '';
   mock = await loadMock();
   env.ready = true;
   if (mock && mock.phase === 'run' && Date.now() >= mock.endsAt) finishMock();   // time ran out while the page was closed

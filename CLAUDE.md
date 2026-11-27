@@ -1,4 +1,4 @@
-# Math Contest Trainer
+# Puzzle Peak (Math Contest Trainer)
 
 A practice app for a grade 5-6 student preparing for Math Kangaroo, the International Math Contest (IMC) and the CREST Mathematics Olympiad (CMO). It runs as a single page hosted inside Claude. Claude writes each problem, a second Claude call can check the answer (a setting, off by default), and the app adapts difficulty per skill.
 
@@ -25,6 +25,7 @@ A practice app for a grade 5-6 student preparing for Math Kangaroo, the Internat
 - **The tutor must not reveal an answer before the student has tried.** Keep that rule in `tutorRules`.
 - **Leveling stays in plain code.** `applyResult` and `pickNext` decide levels and the next skill. Claude is used for writing, checking and tutoring only.
 - **Claude calls are bounded.** At most two drafts per problem, a time limit per call, and no retry loops. Calls start from a learner action.
+- **Points are a reward only.** `pointsFor` (src/js/03b-points.js) gives the level when right first time, 1 for a fixed retry, 0 otherwise (a guess earns 0). Keep it the same rule as `server/app/points.py`. `repoint` adjusts by the difference, so changing a reason never double-counts. Points never change levels.
 - **Mock tests measure, practice teaches.** A mock test gives no hints, tutor or feedback until it ends, takes its remaining time from the stored end time, and never changes skill levels.
 - **No secrets in the page.** It runs in the viewer's browser.
 
