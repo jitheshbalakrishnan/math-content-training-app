@@ -346,7 +346,7 @@ def test_nulls_and_blank_keys_are_refused_politely(api):
 
 def test_the_page_is_served(api):
     r = api.get("/")
-    assert r.status_code == 200 and "Math Contest Trainer" in r.text
+    assert r.status_code == 200 and "Puzzle Peak" in r.text
 
 
 def test_claude_calls_use_the_configured_model_and_are_recorded(api, clean, monkeypatch):
