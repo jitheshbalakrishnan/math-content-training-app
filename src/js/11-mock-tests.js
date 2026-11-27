@@ -128,7 +128,8 @@ function viewMock() {
     if (!env.sample) return [h('div', { class: 'sheet' }, h('h2', null, 'Open this page in Claude to take a test'), h('p', { class: 'muted' }, 'Test questions are written by Claude, which is not available in this view.'))];
     const { key, paper } = mockPaper(), mine = key === S.contest;
     return [h('div', { class: 'sheet' },
-      h('h2', null, 'Timed mock test'),
+      h('h2', null, 'Summit challenge'),
+      h('p', { class: 'muted' }, 'A timed mock test.'),
       h('p', null, 'Set up like the real ' + CONTESTS[key] + ' paper, with a countdown clock and no hints or tutor until you finish.' + (paper.note ? ' ' + paper.note : '')),
       h('p', { class: 'muted' }, 'The full paper: ' + paper.sections.map(sec => sec.count + ' questions at ' + units(sec.points, paper.unit || 'point')).join(', ') + ', in ' + paper.minutes + ' minutes.'),
       mine ? null : h('p', { class: 'muted' }, 'This uses the ' + CONTESTS[key] + ' layout with your ' + (CONTESTS[S.contest] === 'All of them' ? 'topics from every contest' : CONTESTS[S.contest] + ' topics') + '.'),

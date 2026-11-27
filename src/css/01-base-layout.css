@@ -1,7 +1,9 @@
 /* One light look in every viewer theme, by choice: the page is squared paper. */
 /* Layout: an exercise book on a plain background (squares only on the scratchpad, where they help). One problem per sheet, a red margin rule down the left, a single left-aligned column. */
 :root{
-  --paper:#F3F6FA; --grid:#DCE5F0; --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
+  --paper:#E4F1FA; --grid:#DCE5F0; --sky:#C9E5F7; --far:#A9CFEA; --near:#7FB2D6;
+  --pine:#1E6B57; --pine-dark:#134A3C; --pine-bg:#DDF0E8; --sun:#F28C28; --sun-soft:#FBD5A8; --sun-bg:#FDEEDC; --lock:#C3CCDA;
+  --radius:16px; --lift:0 1px 0 rgba(24,36,74,.06), 0 8px 22px rgba(24,36,74,.08); --sheet:#FFFFFF; --ink:#18244A; --muted:#566283;
   --margin:#D9483B; --hl:#FFDD55; --on-hl:#18244A; --good:#12764F; --good-bg:#DDF3E8; --bad:#B93426; --bad-bg:#FBE4E0; --line:#C3CFE0; --shade:#B9C6DA;
   color-scheme:light;
   --display:"Gabarito","Trebuchet MS",system-ui,sans-serif;
