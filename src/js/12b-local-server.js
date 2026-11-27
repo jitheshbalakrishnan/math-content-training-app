@@ -37,4 +37,8 @@ function localSample() {             // the same shape as Claude's page capabili
   };
   return sample;
 }
+async function localChildName() {    // the child's first name from the database (the first child, until there is a picker)
+  try { const r = await fetch('/api/children', { cache: 'no-store' }); const list = r.ok ? await r.json() : []; return (list[0] && list[0].first_name) || ''; }
+  catch (e) { return ''; }
+}
 function withAgent(opts, agent) { return env.local ? Object.assign(opts, { agent }) : opts; }   // Claude's own page does not take this option

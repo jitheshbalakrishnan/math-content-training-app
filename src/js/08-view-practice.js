@@ -116,6 +116,7 @@ function viewPracticeBody() {
       out.push(chatBlock(c));
       return [h('div', { class: 'sheet' }, out)];
     }
+    if (c.pts) out.push(h('p', { class: 'pts' + (fresh ? ' pop' : '') }, '+' + c.pts + (c.pts === 1 ? ' point' : ' points')));
     if (moved && t.mode !== 'placement') out.push(h('p', { class: moved > 0 ? 'cheer' + (fresh ? ' pop' : '') : '' }, moved > 0 ? 'Level up. ' + SK[t.skill].name + ' is now level ' + st.level + '.' : 'This skill drops to level ' + st.level + ' for now, to rebuild it.'));
     if (c.setDone) out.push(h('p', { class: 'cheer' + (fresh ? ' pop' : '') }, "Today's set is done. Nice work."));
     if (c.correct) {

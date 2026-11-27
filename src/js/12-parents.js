@@ -69,6 +69,12 @@ function viewParents() {
       h('div', { class: 'field' }, h('label', { for: 'pt-day' }, 'Problems a day'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-day', value: goals().day, onchange: setGoal('day', 3, 30) })),
       h('div', { class: 'field' }, h('label', { for: 'pt-week' }, 'Problems a week'), h('input', { type: 'text', inputmode: 'numeric', id: 'pt-week', value: goals().week, onchange: setGoal('week', 10, 200) }))),
     h('p', { class: 'muted small' }, 'The daily goal is the size of "today\'s set" on his Home screen. Reaching it does not stop him practicing. Daily goal 3 to 30, weekly goal 10 to 200.'));
-  return [form, list, goal, check];
+  const who = h('div', { class: 'sheet' }, h('h3', null, "Child's name"),
+    env.childName
+      ? h('p', null, env.childName, h('span', { class: 'muted' }, ' (from the database on the home computer)'))
+      : h('div', { class: 'field' }, h('label', { for: 'pt-child' }, 'First name, shown on his Home and Score pages'),
+          h('input', { type: 'text', id: 'pt-child', maxlength: 30, autocomplete: 'off', value: S.name || '',
+            onchange: ev => { S.name = ev.target.value.trim().slice(0, 30); saveState(); render(); } })));
+  return [who, form, list, goal, check];
 }
 
