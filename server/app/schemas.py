@@ -33,7 +33,16 @@ class ChildPatch(Patch):
     daily_goal: int | None = Field(default=None, ge=1, le=200)
     weekly_goal: int | None = Field(default=None, ge=1, le=1000)
     placement: dict | None = None
-    settings: dict | None = None
+    settings: dict | None = None          # the page's own choices: writer tier, answer check, next skill and retry
+
+    @model_validator(mode="after")
+    def small(self):
+        import json
+        for f in ("placement", "settings"):
+            v = getattr(self, f)
+            if v is not None and len(json.dumps(v)) > 20_000:
+                raise ValueError(f"{f} is too large")
+        return self
 
 
 class ProblemIn(BaseModel):
@@ -137,3 +146,12 @@ class ClaudeIn(BaseModel):
     messages: list[Turn] = Field(min_length=1, max_length=40)
     tier: Literal["quick", "default"] | None = None
     child_id: int | None = None
+
+
+class TopicIn(BaseModel):
+    """A topic a parent adds on the Parents page. The page makes the id."""
+    skill_id: str = Field(pattern=r"^custom\.[a-z0-9]{1,20}$")
+    name: str = Field(min_length=1, max_length=60)
+    topic: str = Field(min_length=1, max_length=20)
+    contests: list[str] = Field(default=[], max_length=10)
+    note: str | None = Field(default=None, max_length=400)

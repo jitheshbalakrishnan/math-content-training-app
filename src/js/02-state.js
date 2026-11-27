@@ -36,6 +36,7 @@ async function loadState() {
 }
 let saveChain = Promise.resolve();
 function saveState() {
+  if (env.local && LOCAL.child) queueChildSave();         // levels and points are saved by the answer itself
   const copy = clone(S);
   try { localStorage.setItem(LS, JSON.stringify(copy)); } catch (e) {}
   if (env.db && env.base) {

@@ -366,6 +366,7 @@ async function loadState() {
 }
 let saveChain = Promise.resolve();
 function saveState() {
+  if (env.local && LOCAL.child) queueChildSave();         // levels and points are saved by the answer itself
   const copy = clone(S);
   try { localStorage.setItem(LS, JSON.stringify(copy)); } catch (e) {}
   if (env.db && env.base) {
@@ -378,6 +379,82 @@ async function logAttempt(a) {
   try { return await env.db.collection(env.base).doc('log').collection('attempts').add(a); } catch (e) { return null; }
 }
 
+/* ---------- served from the home computer: progress lives in its database ----------
+   The server marks every answer, sets levels and keeps points; the page shows its own copy at once
+   and takes the server's on the reply. Mock tests are kept in this browser until they move too. */
+const LOCAL = { child: null, timer: null, chain: Promise.resolve() };
+async function api(method, path, body) {
+  let r;
+  try {
+    r = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  } catch (e) { throw { code: 'offline' }; }
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw { code: j.code || (r.status === 409 ? 'conflict' : 'failed'), detail: j.detail || '', status: r.status };
+  return j;
+}
+const fromServerSkill = s => ({ level: s.level, up: s.up, down: s.down, n: s.attempts, ok: s.correct, reasons: s.reasons || {}, recent: s.recent || [] });
+async function loadLocalState() {   // his saved progress from the database, in the page's own shape
+  const kids = await api('GET', '/api/children');
+  if (!kids.length) return null;
+  const id = LOCAL.child = kids[0].id;                    // the first child, until there is a picker
+  const [sum, days, custom] = await Promise.all([api('GET', '/api/children/' + id), api('GET', '/api/children/' + id + '/days'), api('GET', '/api/children/' + id + '/topics')]);
+  env.childName = sum.first_name || '';
+  const set = sum.settings || {}, pl = sum.placement || {};
+  let kept = {};                                           // what still lives in this browser: past mock test results
+  try { kept = JSON.parse(localStorage.getItem(LS) || '{}') || {}; } catch (e) {}
+  return {
+    v: 1, contest: sum.contest || null, focus: sum.focus || null,
+    placement: Array.isArray(pl.queue) ? { queue: pl.queue, i: pl.i || 0, done: !!pl.done } : { queue: [], i: 0, done: false },
+    skills: Object.fromEntries(Object.entries(sum.skills || {}).map(([k, s]) => [k, fromServerSkill(s)])),
+    goals: sum.goals, tier: set.tier === 'default' ? 'default' : 'quick', verify: !!set.verify,
+    planned: set.planned || null, retry: set.retry || null, last: set.last || null,
+    custom, points: sum.points || 0, topicPts: sum.topic_points || {}, name: sum.first_name || '',
+    days: Object.fromEntries(days.map(d => [d.day, { n: d.n, ok: d.ok, pts: d.pts }])),
+    mocks: Array.isArray(kept.mocks) ? kept.mocks : [],
+  };
+}
+function localNotice(e) {
+  showNotice(e && e.code === 'offline' ? "Can't reach the home computer, so this wasn't saved. Check that it is on."
+    : 'Something could not be saved on the home computer. Your last answer may not count.');
+}
+function queueChildSave() {          // settings and the placement, sent a moment after the last change
+  clearTimeout(LOCAL.timer);
+  LOCAL.timer = setTimeout(() => {
+    const g = goals(), body = { contest: S.contest, focus: S.focus, daily_goal: g.day, weekly_goal: g.week, placement: S.placement,
+      settings: { tier: S.tier, verify: !!S.verify, planned: S.planned, retry: S.retry, last: S.last } };
+    LOCAL.chain = LOCAL.chain.then(() => api('PATCH', '/api/children/' + LOCAL.child, body)).catch(localNotice);
+  }, 300);
+}
+function localAnswer(c) {            // store the problem, then the answer; the reply's level and points are the real ones
+  const p = c.p, t = c.target;
+  c.saved = (async () => {
+    const prob = await api('POST', '/api/problems', { skill: t.skill, level: Math.max(1, Math.min(5, t.level)),
+      contest: S.contest && S.contest !== 'both' ? S.contest : null, question: p.question, choices: p.choices, answer_index: p.answer,
+      solution: p.solution || null, hints: p.hints || [], figure: p.figure || null, choice_figures: p.choice_figures || null,
+      written_by: 'writer', check_status: p.checked ? 'passed' : 'unchecked' });
+    const a = await api('POST', '/api/children/' + LOCAL.child + '/answers', { problem_id: prob.id, mode: t.mode,
+      chosen_index: c.picked, hints_used: c.hints, seconds: c.ms != null ? Math.round(c.ms / 1000) : null });
+    S.skills[t.skill] = fromServerSkill(a.skill);
+    return a.answer_id;
+  })();
+  c.saved.catch(localNotice);
+}
+function afterSave(c, step) {         // changes to one answer go out one at a time, in the order he made them
+  if (!c.saved) return;
+  c.queue = (c.queue || c.saved).then(id => step(id).catch(e => { if (e.status !== 409) localNotice(e); }).then(() => id));
+  c.queue.catch(() => {});
+}
+function localReason(c) {            // a reason or note added after answering; a guess redoes the level change
+  const body = { trouble_reason: c.reason || null, note: c.note || null };
+  afterSave(c, id => api('PATCH', '/api/children/' + LOCAL.child + '/answers/' + id, body)
+    .then(r => { if (r && r.releveled && r.skill) { S.skills[c.target.skill] = fromServerSkill(r.skill); if (cur === c) render(); } }));
+}
+function localRetry(c, pick) {       // another go at a missed problem, marked by the server
+  afterSave(c, id => api('POST', '/api/children/' + LOCAL.child + '/answers/' + id + '/retry', { chosen_index: pick }));
+}
+function localLevel(skill, level) {  // placement sets a starting level directly
+  api('PUT', '/api/children/' + LOCAL.child + '/skills/' + encodeURIComponent(skill), { level }).catch(localNotice);
+}
 /* ---------- leveling: two clean rights go up, two wrongs go down ---------- */
 function applyResult(st, r) {
   const wrong = !r.correct || r.guessed;
@@ -881,6 +958,7 @@ function check() {
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   c.pts = 0; repoint(c);
   settle();
+  if (env.local) localAnswer(c);
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
   render();
@@ -889,6 +967,7 @@ function checkRetry() {              // another go at a missed question; stats a
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
   c.fresh = true;
+  if (env.local) localRetry(c, c.pick2);
   if (c.pick2 === c.p.answer) { c.fixed = true; repoint(c); saveState(); }
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;
@@ -897,6 +976,7 @@ function checkRetry() {              // another go at a missed question; stats a
 }
 function setFeedback(patch) {
   const c = cur; Object.assign(c, patch); repoint(c); settle();
+  if (env.local) localReason(c);
   if (c.log) c.log.then(ref => ref && ref.update({ reason: c.reason, note: c.note })).catch(() => {});
   render();
 }
@@ -904,7 +984,10 @@ function advance() {
   const c = cur, id = c.target.skill, wrong = !c.correct || c.reason === 'guess';
   if (c.ctl) c.ctl.abort();
   if (c.target.mode === 'placement') {
-    if (wrong) for (const s of contestSkills()) if (s.topic === SK[id].topic) { const x = skillState(s.id); if (x.n === 0 || s.id === id) { x.level = 2; x.up = 0; x.down = 0; } }
+    if (wrong) for (const s of contestSkills()) if (s.topic === SK[id].topic) {
+      const x = skillState(s.id);
+      if (x.n === 0 || s.id === id) { x.level = 2; x.up = 0; x.down = 0; if (env.local) (c.saved || Promise.resolve()).then(() => localLevel(s.id, 2)).catch(() => {}); }
+    }
     S.placement.i++;
     if (S.placement.i >= S.placement.queue.length) { S.placement.done = true; placedNote = true; }
   } else S.retry = (c.target.mode === 'practice' && wrong) ? id : null;
@@ -1229,7 +1312,7 @@ function viewProgressBody() {
   const reset = h('div', { class: 'row' }, confirmReset
     ? [h('span', null, 'Erase all progress? Added topics and settings stay.'), h('button', { class: 'btn', type: 'button', onclick: erase }, 'Erase progress'), h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = false; render(); } }, 'Keep it')]
     : h('button', { class: 'btn quiet', type: 'button', onclick: () => { confirmReset = true; render(); } }, 'Start over'));
-  const some = (S.mocks && S.mocks.length) || Object.keys(S.days || {}).length;      // anything a reset would clear
+  const some = !(env.local && LOCAL.child) && ((S.mocks && S.mocks.length) || Object.keys(S.days || {}).length);   // anything a reset would clear; on the home computer the database keeps his history
   if (!n) return [logTiles(), h('div', { class: 'sheet' }, h('h2', null, 'No skills to show yet'),
     h('p', { class: 'muted' }, 'Answer a few problems and each skill appears here with its level and how many you got right.'),
     h('div', { class: 'row' }, h('a', { class: 'btn primary', href: '#home' }, 'Go to today\'s set'))), ...(some ? [reset] : [])];
@@ -1251,7 +1334,7 @@ function viewProgressBody() {
         st && st.n ? levelDots(st.level) : h('span', { class: 'muted small' }, 'not tried'),
         h('span', { class: 'n' }, st && st.n ? st.ok + ' of ' + st.n + ' right' : ''));
     }))));
-  return [logTiles(), head, ...groups, reset];
+  return [logTiles(), head, ...groups, env.local && LOCAL.child ? h('p', { class: 'muted small' }, 'Progress is kept on the home computer.') : reset];
 }
 
 /* ---------- score: his points as a climb up Puzzle Peak, this week's points and points by topic ---------- */
@@ -1641,11 +1724,14 @@ function addTopic(ev) {
     : allSkills().some(s => s.name.toLowerCase() === name.toLowerCase()) ? 'There is already a topic called "' + name + '".'
     : (S.custom || []).length >= MAX_ADDED ? 'You can add up to ' + MAX_ADDED + ' topics. Remove one first.' : '';
   if (err) { const e = $('pt-error'); e.textContent = err; e.hidden = false; return; }
-  S.custom = (S.custom || []).concat({ id: 'custom.' + Date.now().toString(36), name, topic: TOPIC[group] ? group : 'custom', contests, prerequisites: [], note });
+  const topic = { id: 'custom.' + Date.now().toString(36), name, topic: TOPIC[group] ? group : 'custom', contests, prerequisites: [], note };
+  S.custom = (S.custom || []).concat(topic);
+  if (env.local && LOCAL.child) api('POST', '/api/children/' + LOCAL.child + '/topics', { skill_id: topic.id, name, topic: topic.topic, contests, note: note || null }).catch(localNotice);
   syncCustom(); saveState(); render();
 }
 function removeTopic(id) {
   S.custom = (S.custom || []).filter(s => s.id !== id);
+  if (env.local && LOCAL.child) api('DELETE', '/api/children/' + LOCAL.child + '/topics/' + encodeURIComponent(id)).catch(localNotice);
   delete S.skills[id];
   const q = S.placement.queue, at = q.indexOf(id);
   if (at >= 0) { q.splice(at, 1); if (at < S.placement.i) S.placement.i--; if (S.contest && S.placement.i >= q.length) S.placement.done = true; }
@@ -1771,7 +1857,12 @@ async function boot() {
   env.sample = sample;
   if (!sample && await findLocalServer()) { env.sample = localSample(); env.local = true; env.childName = await localChildName(); }
   if (db && user) { try { const id = await user.id(); if (id) { env.db = db; env.base = 'data/users/' + id; } } catch (e) {} }
-  const saved = await loadState();
+  let saved = null;
+  if (env.local) {
+    try { saved = await loadLocalState(); } catch (e) { saved = null; }
+    if (!saved) { LOCAL.child = null; showNotice('No child is set up in the database yet, so progress is kept in this browser.'); }
+  }
+  if (!saved) saved = await loadState();
   if (saved && saved.v === 1) S = Object.assign(newState(), saved);
   if (!Array.isArray(S.custom)) S.custom = [];
   syncCustom();

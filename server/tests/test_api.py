@@ -407,3 +407,35 @@ def test_without_a_secret_other_devices_cannot_use_the_api(api, monkeypatch):
     r = api.get("/api/children")
     assert r.status_code == 403 and "APP_TOKEN" in r.json()["detail"]
     assert api.get("/?token=", follow_redirects=False).status_code == 403
+
+
+# ---------- the page's own saving (local mode) ----------
+
+def test_days_and_topic_points_for_the_page(api):
+    cid = child(api)
+    api.post(f"/api/children/{cid}/answers", json={"problem_id": problem(api, skill="number.fractions", level=4), "mode": "practice", "chosen_index": 1})
+    api.post(f"/api/children/{cid}/answers", json={"problem_id": problem(api, skill="geometry.perimeter", n=2), "mode": "practice", "chosen_index": 0})
+    assert api.get(f"/api/children/{cid}/days").json() == [{"day": "2026-11-26", "n": 2, "ok": 1, "pts": 4}]
+    assert api.get(f"/api/children/{cid}").json()["topic_points"] == {"number": 4, "geometry": 0}
+
+
+def test_added_topics_are_shared_by_the_family(api):
+    sam, ria = child(api), child(api, "Ria")
+    t = {"skill_id": "custom.abc1", "name": "Magic squares", "topic": "logic", "contests": ["kangaroo"], "note": None}
+    assert api.post(f"/api/children/{sam}/topics", json=t).status_code == 201
+    assert api.post(f"/api/children/{ria}/topics", json=t).status_code == 409
+    assert [x["name"] for x in api.get(f"/api/children/{ria}/topics").json()] == ["Magic squares"]
+    assert api.post(f"/api/children/{sam}/topics", json={**t, "skill_id": "../etc"}).status_code == 422
+    api.put(f"/api/children/{sam}/skills/custom.abc1", json={"level": 4})
+    assert api.delete(f"/api/children/{sam}/topics/custom.abc1").status_code == 200
+    assert api.get(f"/api/children/{sam}/topics").json() == []
+    assert "custom.abc1" not in api.get(f"/api/children/{sam}").json()["skills"]
+
+
+def test_the_page_saves_its_settings_on_the_child(api):
+    cid = child(api)
+    body = {"contest": "kangaroo", "focus": "number", "placement": {"queue": ["number.fractions"], "i": 1, "done": True},
+            "settings": {"tier": "default", "verify": True, "planned": "number.decimals", "retry": None, "last": "number.fractions"}}
+    r = api.patch(f"/api/children/{cid}", json=body).json()
+    assert (r["settings"]["planned"], r["placement"]["i"], r["focus"]) == ("number.decimals", 1, "number")
+    assert api.patch(f"/api/children/{cid}", json={"settings": {"x": "y" * 30_000}}).status_code == 422

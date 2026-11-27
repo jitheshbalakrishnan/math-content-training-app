@@ -8,8 +8,10 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .config import TIMEZONE
-from .models import (Answer, Child, Family, MockTest, MockTestItem, PracticeSession, Problem as ProblemRow,
+import json
+
+from .config import SKILL_MAP, TIMEZONE
+from .models import (Answer, Child, CustomTopic, Family, MockTest, MockTestItem, PracticeSession, Problem as ProblemRow,
                      SkillProgress)
 from .points import points_for
 from .rules.answers import is_correct
@@ -122,6 +124,82 @@ def update_child(db: Session, child_id: int, body: schemas.ChildPatch) -> dict:
     return child_summary(db, child_id, datetime.now(TZ))
 
 
+_SKILL_TOPICS: dict | None = None
+
+
+def _skill_topics(db: Session, family_id: int) -> dict:
+    """Skill id -> topic, from skill_map.json and this family's added topics."""
+    global _SKILL_TOPICS
+    if _SKILL_TOPICS is None:
+        _SKILL_TOPICS = {s["id"]: s["topic"] for s in json.loads(SKILL_MAP.read_text())["skills"]}
+    added = dict(db.execute(select(CustomTopic.skill_id, CustomTopic.topic).where(CustomTopic.family_id == family_id)).all())
+    return {**_SKILL_TOPICS, **added}
+
+
+def child_days(db: Session, child_id: int, now: datetime, days: int = 120) -> list[dict]:
+    """Problems answered, right and points per calendar day, oldest first: the page's week and streak."""
+    _child(db, child_id)
+    counted = _counted_answers(child_id).subquery()
+    rows = db.execute(select(counted.c.answered_at, counted.c.correct, counted.c.points)
+                      .where(counted.c.answered_at >= now - timedelta(days=days))).all()
+    out: dict = {}
+    for at, correct, pts in rows:
+        d = out.setdefault(local_day(at, TZ).isoformat(), {"n": 0, "ok": 0, "pts": 0})
+        d["n"] += 1
+        d["ok"] += int(bool(correct))
+        d["pts"] += pts or 0
+    return [{"day": k, **v} for k, v in sorted(out.items())]
+
+
+def topic_points(db: Session, child_id: int) -> dict:
+    child = _child(db, child_id)
+    counted = _counted_answers(child_id).subquery()
+    rows = db.execute(select(ProblemRow.skill, func.sum(counted.c.points))
+                      .join(ProblemRow, ProblemRow.id == counted.c.problem_id).group_by(ProblemRow.skill)).all()
+    topics = _skill_topics(db, child.family_id)
+    out: dict = {}
+    for skill, pts in rows:
+        t = topics.get(skill, "custom")
+        out[t] = out.get(t, 0) + int(pts or 0)
+    return out
+
+
+def list_topics(db: Session, child_id: int) -> list[dict]:
+    child = _child(db, child_id)
+    rows = db.scalars(select(CustomTopic).where(CustomTopic.family_id == child.family_id).order_by(CustomTopic.id))
+    return [{"id": t.skill_id, "name": t.name, "topic": t.topic, "contests": t.contests, "note": t.note,
+             "prerequisites": []} for t in rows]
+
+
+def add_topic(db: Session, child_id: int, body: schemas.TopicIn) -> dict:
+    child = _child(db, child_id)
+    if db.scalar(select(func.count()).select_from(CustomTopic).where(CustomTopic.family_id == child.family_id)) >= 20:
+        raise Problem(409, "You can add up to 20 topics. Remove one first.")
+    t = CustomTopic(family_id=child.family_id, skill_id=body.skill_id, name=body.name.strip(), topic=body.topic,
+                    contests=body.contests, note=body.note)
+    db.add(t)
+    try:
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise Problem(409, "That topic is already added.")
+    return {"id": t.skill_id, "name": t.name, "topic": t.topic, "contests": t.contests, "note": t.note, "prerequisites": []}
+
+
+def remove_topic(db: Session, child_id: int, skill_id: str) -> dict:
+    """Removes the topic for the family, and its levels for every child in it. Past answers stay."""
+    child = _child(db, child_id)
+    t = db.scalars(select(CustomTopic).where(CustomTopic.family_id == child.family_id, CustomTopic.skill_id == skill_id)).first()
+    if t is None:
+        raise Problem(404, "No such added topic.")
+    kids = select(Child.id).where(Child.family_id == child.family_id)
+    for sp in db.scalars(select(SkillProgress).where(SkillProgress.skill == skill_id, SkillProgress.child_id.in_(kids))):
+        db.delete(sp)
+    db.delete(t)
+    db.flush()
+    return {"removed": skill_id}
+
+
 def child_summary(db: Session, child_id: int, now: datetime) -> dict:
     """Everything the home and progress screens need, in one call."""
     child = _child(db, child_id)
@@ -150,6 +228,7 @@ def child_summary(db: Session, child_id: int, now: datetime) -> dict:
         "week": week(counts, today),
         "streak": streak(set(counts), today),
         "points": int(points),
+        "topic_points": topic_points(db, child_id),
         "best_mock": _mock_summary(best) if best else None,
         "open_practice": open_practice(db, child_id),
         "live_mock": live,

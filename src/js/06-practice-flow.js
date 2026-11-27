@@ -72,6 +72,7 @@ function check() {
   c.setDone = soFar < goal && doneToday() >= goal;      // this answer finished today's set
   c.pts = 0; repoint(c);
   settle();
+  if (env.local) localAnswer(c);
   if (!c.correct && c.target.mode === 'practice') fetchProblem(id, skillState(id).level);
   c.log = logAttempt({ at: new Date().toISOString(), skill: id, level: c.target.level, mode: c.target.mode, question: c.p.question, figure: c.p.figure || null, choices: c.p.choices, answer: c.p.answer, picked: c.picked, correct: c.correct, ms: c.ms, hints: c.hints, reason: null, note: '' });
   render();
@@ -80,6 +81,7 @@ function checkRetry() {              // another go at a missed question; stats a
   const c = cur;
   if (!c || !c.retrying || c.pick2 == null) return;
   c.fresh = true;
+  if (env.local) localRetry(c, c.pick2);
   if (c.pick2 === c.p.answer) { c.fixed = true; repoint(c); saveState(); }
   else c.missed = (c.missed || []).concat(c.pick2);
   c.retrying = false; c.pick2 = null;
@@ -88,6 +90,7 @@ function checkRetry() {              // another go at a missed question; stats a
 }
 function setFeedback(patch) {
   const c = cur; Object.assign(c, patch); repoint(c); settle();
+  if (env.local) localReason(c);
   if (c.log) c.log.then(ref => ref && ref.update({ reason: c.reason, note: c.note })).catch(() => {});
   render();
 }
@@ -95,7 +98,10 @@ function advance() {
   const c = cur, id = c.target.skill, wrong = !c.correct || c.reason === 'guess';
   if (c.ctl) c.ctl.abort();
   if (c.target.mode === 'placement') {
-    if (wrong) for (const s of contestSkills()) if (s.topic === SK[id].topic) { const x = skillState(s.id); if (x.n === 0 || s.id === id) { x.level = 2; x.up = 0; x.down = 0; } }
+    if (wrong) for (const s of contestSkills()) if (s.topic === SK[id].topic) {
+      const x = skillState(s.id);
+      if (x.n === 0 || s.id === id) { x.level = 2; x.up = 0; x.down = 0; if (env.local) (c.saved || Promise.resolve()).then(() => localLevel(s.id, 2)).catch(() => {}); }
+    }
     S.placement.i++;
     if (S.placement.i >= S.placement.queue.length) { S.placement.done = true; placedNote = true; }
   } else S.retry = (c.target.mode === 'practice' && wrong) ? id : null;
