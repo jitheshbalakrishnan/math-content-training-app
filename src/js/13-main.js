@@ -30,7 +30,8 @@ async function boot() {
   if (typeof S.points !== 'number' || !(S.points >= 0)) S.points = 0;
   if (!S.topicPts || typeof S.topicPts !== 'object' || Array.isArray(S.topicPts)) S.topicPts = {};
   if (typeof S.name !== 'string') S.name = '';
-  mock = await loadMock();
+  mock = env.local && LOCAL.child ? await localLoadMock(LOCAL.summary).catch(() => null) : await loadMock();
+  if (env.local && LOCAL.resume && S.contest) resumeProblem(LOCAL.resume);
   env.ready = true;
   if (mock && mock.phase === 'run' && Date.now() >= mock.endsAt) finishMock();   // time ran out while the page was closed
   else render();

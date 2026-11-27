@@ -25,6 +25,7 @@ async function loadProblem() {
     const p = await wanted;
     if (!cur || cur.target !== t) return;
     cur = { target: t, p, picked: null, checked: false, hints: 0, t0: Date.now(), chat: [], chatOpen: false, reason: null, note: '' };
+    if (env.local && LOCAL.child) localShowProblem(cur);
   } catch (e) {
     if (!cur || cur.target !== t) return;
     cur = { target: t, error: errCopy(e), why: e && e.why };

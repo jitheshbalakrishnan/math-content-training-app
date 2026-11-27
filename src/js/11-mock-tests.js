@@ -20,6 +20,7 @@ function saveMock() {                // a test in progress survives a reload; th
   const keep = mock && mock.phase !== 'prep' ? clone({ v: 1, phase: mock.phase, size: mock.size, answers: mock.answers, at: mock.at, started: mock.started, endsAt: mock.endsAt, usedSecs: mock.usedSecs || 0, unit: mock.unit || 'point',
     items: mock.items.map(it => ({ skill: it.skill, level: it.level, points: it.points, label: it.label, p: it.p })) }) : null;
   try { if (keep) localStorage.setItem(LS_MOCK, JSON.stringify(keep)); else localStorage.removeItem(LS_MOCK); } catch (e) {}
+  if (keep && mock && mock.serverId) keep.serverId = mock.serverId;
   if (env.db && env.base) {
     const doc = env.db.collection(env.base).doc('mock');
     mockChain = mockChain.then(() => keep ? doc.set(keep) : doc.delete()).catch(() => {});
@@ -73,6 +74,7 @@ function startMock() {
   const m = mock;
   m.items = m.items.filter(it => it.status === 'ok');
   const minutes = Math.max(5, Math.round(m.plannedMinutes * m.items.length / m.planned));    // fewer questions, less time
+  if (env.local && LOCAL.child) { pad.forget(); localStartMock(m, minutes); return; }
   pad.forget();
   m.phase = 'run'; m.answers = m.items.map(() => null); m.at = 0;
   m.started = Date.now(); m.endsAt = m.started + minutes * 60000;
@@ -93,8 +95,9 @@ function mockScore(m) {
 function finishMock() {
   const m = mock;
   if (!m || m.phase !== 'run') return;
+  if (env.local && m.serverId && m.serverDone !== true) { if (m.serverDone !== 'pending') { m.serverDone = 'pending'; localFinishMock(m); } return; }
   m.phase = 'done'; confirmFinish = false; pad.forget();
-  m.usedSecs = Math.round((Math.min(Date.now(), m.endsAt) - m.started) / 1000);
+  if (!m.serverId) m.usedSecs = Math.round((Math.min(Date.now(), m.endsAt) - m.started) / 1000);   // the server measured it otherwise
   const r = mockScore(m), at = new Date().toISOString();
   S.mocks = (S.mocks || []).concat({ at, size: m.size, n: m.items.length, correct: r.correct, score: r.score, max: r.max, secs: m.usedSecs, unit: m.unit || 'point' }).slice(-20);
   tally(m.answers.filter(a => a != null).length, r.correct);     // test questions he answered count toward the day and the week
@@ -108,6 +111,7 @@ setInterval(() => {                  // the test clock; time is taken from the e
   if (!mock || mock.phase !== 'run') return;
   const left = mock.endsAt - Date.now();
   if (left <= 0) { finishMock(); return; }
+  if (env.local) localMockBeat(mock);
   const el = $('mock-clock');
   if (el) { el.textContent = clockText(left); el.classList.toggle('low', left < 5 * 60000); }
 }, 1000);
@@ -147,7 +151,7 @@ function viewMock() {
       !m.busy && failed ? h('p', { class: 'muted' }, failed + (failed === 1 ? ' question' : ' questions') + ' could not be written.') : null,
       !m.busy && !failed ? h('p', { class: 'muted' }, 'The clock starts when you press Start. Have paper and a pencil ready.') : null,
       h('div', { class: 'row' },
-        !m.busy && ready >= 3 ? h('button', { class: 'btn primary', type: 'button', onclick: startMock }, failed ? 'Start with ' + ready + ' questions' : 'Start the test') : null,
+        !m.busy && ready >= 3 ? h('button', { class: 'btn primary', type: 'button', disabled: !!m.starting, onclick: startMock }, m.starting ? 'Starting' : failed ? 'Start with ' + ready + ' questions' : 'Start the test') : null,
         !m.busy && failed ? h('button', { class: 'btn', type: 'button', onclick: writeMockItems }, 'Write the missing ones') : null,
         h('button', { class: 'btn quiet', type: 'button', onclick: cancelMock }, 'Cancel')))];
   }
@@ -160,7 +164,7 @@ function viewMock() {
       withPad('mock' + m.at, h('div', { class: 'sheet' },
         h('p', { class: 'question' }, it.p.question),
         it.p.figure ? figureEl(it.p.figure) : null,
-        mockChoices(it, m.answers[m.at], false, i => { m.answers[m.at] = m.answers[m.at] === i ? null : i; saveMock(); render(); }),
+        mockChoices(it, m.answers[m.at], false, i => { m.answers[m.at] = m.answers[m.at] === i ? null : i; if (m.serverId) localMockAnswer(m, m.at, m.answers[m.at]); saveMock(); render(); }),
         h('div', { class: 'row' },
           h('button', { class: 'btn quiet', type: 'button', disabled: m.at === 0, onclick: () => go(m.at - 1) }, 'Back'),
           h('button', { class: 'btn primary', type: 'button', disabled: m.at === n - 1, onclick: () => go(m.at + 1) }, 'Next question')),
