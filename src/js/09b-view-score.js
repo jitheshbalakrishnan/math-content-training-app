@@ -1,4 +1,4 @@
-/* ---------- score: his points as a climb up Puzzle Peak, this week's points and points by topic ---------- */
+/* ---------- score: his points as a climb up PuzzlePeak, this week's points and points by topic ---------- */
 function climber(x, y) {             // a small hiker with a backpack, standing on the trail at (x, y)
   return sv('g', { transform: `translate(${x},${y})` },
     sv('ellipse', { cx: 0, cy: 1, rx: 10, ry: 3, fill: 'rgba(24,36,74,.25)' }),
@@ -93,7 +93,7 @@ function viewScore() {
   return [
     h('div', { class: 'tiles' },
       h('div', { class: 'tile dark' }, h('span', { class: 'muted' }, name ? name + "'s points" : 'Your points'), h('span', { class: 'big' }, S.points || 0),
-        h('span', { class: 'small' }, c.mountain > 1 ? 'Mountain ' + c.mountain : 'Puzzle Peak')),
+        h('span', { class: 'small' }, c.mountain > 1 ? 'Mountain ' + c.mountain : 'PuzzlePeak')),
       h('div', { class: 'tile' }, h('span', { class: 'muted' }, 'Today'), h('span', { class: 'big' }, '+' + pointsToday()), h('span', { class: 'small' }, week + ' this week')),
       h('div', { class: 'tile' }, h('span', { class: 'muted' }, 'Days in a row'), h('span', { class: 'big' }, run), h('span', { class: 'small' }, run ? 'Keep it going tomorrow' : 'Practice today to start'))),
     h('div', { class: 'sheet' }, h('h2', null, c.camp), mountainSvg(c)),
