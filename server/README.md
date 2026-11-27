@@ -36,8 +36,12 @@ uv run uvicorn app.main:app --port 8000
 ```
 
 Then open http://localhost:8000 for the app, or http://localhost:8000/docs to see and try every route. Only this Mac can reach it.
-Adding `--host 0.0.0.0` lets other devices at home use it, but there is no sign-in yet, so
-anyone on your home network could.
+
+To use it on a phone or tablet at home: put a long random secret in `.env` as `APP_TOKEN`
+(for example the output of `openssl rand -hex 16`), start the server with `--host 0.0.0.0`, and
+open `http://<this Mac's address>:8000/?token=<APP_TOKEN>` once on that device. The browser
+keeps a cookie, so after that the plain address works. Without the secret, other devices can
+open the page but cannot use the API, so they cannot spend your Claude key or see progress.
 
 Optional settings in `.env`: `APP_TIMEZONE` (default `America/New_York`, used for daily counts
 and streaks) and `CORS_ORIGINS` (comma-separated, for a page served from another address).

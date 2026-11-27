@@ -2,8 +2,9 @@
 
     uv run uvicorn app.main:app --port 8000
 
-Only this Mac can reach it by default. To use it from another device at home, add
---host 0.0.0.0; there is no sign-in yet, so anyone on the home network could then use it.
+Only this Mac can reach it by default. To use it from another device at home, set APP_TOKEN in
+.env, run with --host 0.0.0.0, and open http://<mac-address>:8000/?token=<APP_TOKEN> once on that
+device (see app/access.py).
 """
 import os
 import time
@@ -12,21 +13,31 @@ from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from . import schemas, service
+from . import access, schemas, service
 from .agents import claude
 from .config import CORS_ORIGINS, ROOT, agents
 from .db import Session as SessionMaker
 from .models import AgentRun
 
 PAGE = ROOT / "math-contest-trainer.html"
+APP_TOKEN = os.environ.get("APP_TOKEN", "").strip()
 
 app = FastAPI(title="Math Contest Trainer", version="0.1.0")
 if CORS_ORIGINS:
     app.add_middleware(CORSMiddleware, allow_origins=CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def only_allowed_devices(request: Request, call_next):
+    ok, why = access.decide(request.client.host if request.client else None, request.url.path, APP_TOKEN,
+                            request.cookies.get(access.COOKIE), request.headers.get(access.HEADER))
+    if not ok:
+        return JSONResponse(status_code=403, content={"code": "not_allowed", "detail": why})
+    return await call_next(request)
 
 
 def get_db() -> Iterator[Session]:
@@ -66,8 +77,15 @@ def run(fn: Callable, db: Session):
 
 
 @app.get("/")
-def page():
-    """The app itself, built from src/ by build.py. Served here, its Claude calls come to /api/claude."""
+def page(token: str | None = None):
+    """The app itself, built from src/ by build.py. Served here, its Claude calls come to /api/claude.
+    ?token=<APP_TOKEN> lets this browser use the API from another device, then drops it from the address."""
+    if token is not None:
+        if not access.token_ok(APP_TOKEN, token):
+            return PlainTextResponse("That link is not right. Ask a grown-up for the app's link.", status_code=403)
+        r = RedirectResponse("/", status_code=303)
+        r.set_cookie(access.COOKIE, token, max_age=365 * 24 * 3600, httponly=True, samesite="strict")
+        return r
     return FileResponse(PAGE, media_type="text/html", headers={"Cache-Control": "no-cache"})
 
 

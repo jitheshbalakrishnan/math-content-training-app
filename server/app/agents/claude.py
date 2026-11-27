@@ -97,7 +97,7 @@ def call(agent: str, cfg: dict, messages: list[dict], tier: str | None = None, k
     start = now()
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT_S) as r:
-            data = json.loads(r.read())
+            raw = r.read()
     except urllib.error.HTTPError as e:
         status = e.code
         try:
@@ -117,7 +117,14 @@ def call(agent: str, cfg: dict, messages: list[dict], tier: str | None = None, k
         if isinstance(e.reason, TimeoutError):
             raise AgentError("timeout", 504, "Claude took too long to answer.")
         raise AgentError("unavailable", 502, f"Could not reach Claude: {e.reason}")
-    text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+    try:                                     # a proxy or outage can answer 200 with an HTML page
+        data = json.loads(raw)
+        blocks = data["content"]
+        if not isinstance(blocks, list):
+            raise TypeError("content is not a list")
+        text = "".join(b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text")
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise AgentError("unavailable", 502, "Claude's answer could not be read.")
     usage = data.get("usage") or {}
     return Reply(text=text, model=data.get("model", model), tokens_in=usage.get("input_tokens"),
                  tokens_out=usage.get("output_tokens"), seconds=round(now() - start, 2))

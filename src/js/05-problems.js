@@ -151,6 +151,7 @@ function errCopy(e) {
   if (c === 'no_key') return 'The Claude key on the home computer is missing or not working. Ask a grown-up to check it.';
   if (c === 'offline') return "Can't reach the home computer. Check that it is on, then try again.";
   if (c === 'timeout') return 'Claude took too long to answer. Try again.';
+  if (c === 'not_allowed') return 'This device is not set up for the app yet. Ask a grown-up to open its secret link here once.';
   return "Couldn't write a problem this time. Try again.";
 }
 

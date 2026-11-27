@@ -16,10 +16,12 @@ class Clock:
 
 
 @pytest.fixture()
-def api(clean):
+def api(clean, monkeypatch):
     from fastapi.testclient import TestClient
 
+    from app import access
     from app.main import app, get_now
+    monkeypatch.setattr(access, "LOOPBACK", access.LOOPBACK | {"testclient"})    # TestClient's made-up host is this Mac
     clock = Clock()
     app.dependency_overrides[get_now] = clock
     with TestClient(app) as client:
@@ -379,3 +381,29 @@ def test_a_failed_claude_call_says_why_and_is_recorded(api, clean, monkeypatch):
 def test_only_live_agents_can_be_called(api):
     r = api.post("/api/claude", json={"agent": "coach", "messages": [{"role": "user", "content": "x"}]})
     assert r.status_code == 422
+
+
+
+# ---------- other devices ----------
+
+def test_another_device_needs_the_secret_link(api, monkeypatch):
+    from app import access, main
+    monkeypatch.setattr(access, "LOOPBACK", set())                  # as if the request came from a phone
+    monkeypatch.setattr(main, "APP_TOKEN", "s3cret")
+    assert api.get("/").status_code == 200                          # the page itself is fine
+    r = api.post("/api/claude", json={"agent": "tutor", "messages": [{"role": "user", "content": "x"}]})
+    assert r.status_code == 403 and r.json()["code"] == "not_allowed"
+    assert api.get("/api/children").status_code == 403
+    assert api.get("/?token=wrong", follow_redirects=False).status_code == 403
+    r = api.get("/?token=s3cret", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/" and "httponly" in r.headers["set-cookie"].lower()
+    assert api.get("/api/children").status_code == 200              # the cookie is kept by the client
+
+
+def test_without_a_secret_other_devices_cannot_use_the_api(api, monkeypatch):
+    from app import access, main
+    monkeypatch.setattr(access, "LOOPBACK", set())
+    monkeypatch.setattr(main, "APP_TOKEN", "")
+    r = api.get("/api/children")
+    assert r.status_code == 403 and "APP_TOKEN" in r.json()["detail"]
+    assert api.get("/?token=", follow_redirects=False).status_code == 403

@@ -40,7 +40,7 @@ async function tutorSend(text, hidden) {
   } catch (e) {
     reply.content = (e && e.text) || '';
     if (late) reply.error = 'The tutor took too long to answer, so it was stopped. Ask again.';
-    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : e && (e.code === 'no_key' || e.code === 'offline') ? errCopy(e) : "The tutor couldn't answer just now. Ask again.";
+    else if (!(e && e.code === 'cancelled')) reply.error = e && e.code === 'not_granted' ? "Claude isn't allowed on this page yet. Allow it from the page's Permissions menu." : e && e.code === 'rate_limited' ? 'Too many questions at once. Wait a minute, then ask again.' : e && ['no_key', 'offline', 'timeout', 'not_allowed'].includes(e.code) ? errCopy(e) : "The tutor couldn't answer just now. Ask again.";
     if (!reply.content && !reply.error) c.chat.splice(c.chat.indexOf(reply), 1);
   }
   clearTimeout(timer);

@@ -104,3 +104,24 @@ def test_unreachable_api(monkeypatch):
     with pytest.raises(claude.AgentError) as e:
         claude.call("writer", CFG, [{"role": "user", "content": "x"}], key="k")
     assert e.value.code == "unavailable"
+
+
+
+@pytest.mark.parametrize("body", [b"<html>Bad gateway</html>", b"[]", b'{"content": "text"}', b'{"no": "content"}'])
+def test_an_unreadable_reply_is_unavailable_not_a_crash(api, monkeypatch, body):
+    class Raw(StandIn):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["content-length"]))
+            self.send_response(200)
+            self.send_header("content-length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    server = HTTPServer(("127.0.0.1", 0), Raw)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    monkeypatch.setattr(claude, "API_URL", f"http://127.0.0.1:{server.server_port}/v1/messages")
+    try:
+        with pytest.raises(claude.AgentError) as e:
+            claude.call("writer", CFG, [{"role": "user", "content": "x"}], key="k")
+        assert e.value.code == "unavailable"
+    finally:
+        server.shutdown()
